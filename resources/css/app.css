@@ -1,0 +1,233 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views';
+
+/*
+|--------------------------------------------------------------------------
+| Planetic Web Design System (Tailwind v4, CSS-first)
+|--------------------------------------------------------------------------
+| Navy base, strong blue action colour, cyan technology accent, green
+| success indicators, clean white surfaces. Targets WCAG 2.2 AA.
+*/
+
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        'Segoe UI', sans-serif;
+
+    /* Primary brand scale */
+    --color-primary-50: #eff6ff;
+    --color-primary-100: #dbeafe;
+    --color-primary-400: #3b82f6;
+    --color-primary-500: #2563eb;
+    --color-primary-600: #1d4ed8;
+    --color-primary-700: #163b68;
+    --color-primary-800: #102a4c;
+    --color-primary-900: #0b1b33;
+    --color-primary-950: #07111f;
+
+    /* Accent colours */
+    --color-accent-cyan: #06b6d4;
+    --color-accent-sky: #0ea5e9;
+    --color-accent-indigo: #4f46e5;
+    --color-accent-violet: #7c3aed;
+
+    /* Neutral / slate */
+    --color-slate-50: #f8fafc;
+    --color-slate-100: #f1f5f9;
+    --color-slate-200: #e2e8f0;
+    --color-slate-300: #cbd5e1;
+    --color-slate-500: #64748b;
+    --color-slate-600: #475569;
+    --color-slate-700: #334155;
+    --color-slate-900: #0f172a;
+
+    /* Status colours */
+    --color-success: #16a34a;
+    --color-success-bg: #dcfce7;
+    --color-warning: #f59e0b;
+    --color-warning-bg: #fef3c7;
+    --color-danger: #dc2626;
+    --color-danger-bg: #fee2e2;
+    --color-info: #0284c7;
+    --color-info-bg: #e0f2fe;
+
+    /* Radii */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+    --radius-2xl: 24px;
+
+    /* Shadows */
+    --shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.08);
+    --shadow-large: 0 18px 50px rgba(15, 23, 42, 0.12);
+    --shadow-dark: 0 18px 50px rgba(0, 0, 0, 0.28);
+}
+
+@layer base {
+    [x-cloak] {
+        display: none !important;
+    }
+
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        @apply bg-white text-slate-900 antialiased;
+        font-family: var(--font-sans);
+    }
+
+    /* Visible focus ring on every interactive element (WCAG 2.4.7) */
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    [tabindex]:focus-visible,
+    summary:focus-visible {
+        outline: 3px solid var(--color-accent-cyan);
+        outline-offset: 3px;
+        border-radius: 4px;
+    }
+
+    h1, h2, h3, h4 {
+        @apply font-bold;
+        /* Inherit colour from context: slate-900 on light pages (from body),
+           white inside dark/hero sections. Avoids invisible dark-on-dark text. */
+        text-wrap: balance;
+    }
+}
+
+@layer components {
+    /* Skip link — appears on focus (WCAG 2.4.1) */
+    .skip-link {
+        @apply sr-only;
+    }
+    .skip-link:focus {
+        @apply not-sr-only fixed left-4 top-4 z-[100] rounded-md bg-primary-500 px-4 py-2 font-semibold text-white;
+    }
+
+    .container-px {
+        @apply mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8;
+    }
+    .container-dash {
+        @apply mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8;
+    }
+
+    /* ---- Buttons (min 44px touch target). Self-contained for Tailwind v4. ---- */
+    .btn {
+        @apply inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px]
+        px-5 py-3 text-base font-semibold transition focus:outline-none disabled:cursor-not-allowed;
+    }
+    .btn-primary {
+        @apply inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px]
+        border border-primary-500 bg-primary-500 px-5 py-3 text-base font-semibold text-white transition
+        hover:border-primary-600 hover:bg-primary-600 disabled:cursor-not-allowed
+        disabled:border-slate-300 disabled:bg-slate-300 disabled:text-slate-500;
+    }
+    .btn-secondary {
+        @apply inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px]
+        border border-slate-300 bg-white px-5 py-3 text-base font-semibold text-slate-900 transition
+        hover:border-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed;
+    }
+    .btn-danger {
+        @apply inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px]
+        border border-danger bg-danger px-5 py-3 text-base font-semibold text-white transition hover:opacity-90;
+    }
+    .btn-success {
+        @apply inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px]
+        border border-success bg-success px-5 py-3 text-base font-semibold text-white transition hover:opacity-90;
+    }
+    .btn-ghost-dark {
+        @apply inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[10px]
+        border border-white/25 bg-white/10 px-5 py-3 text-base font-semibold text-white transition hover:bg-white/20;
+    }
+    .btn-sm {
+        @apply min-h-[40px] px-4 py-2 text-sm;
+    }
+
+    /* ---- Form controls ---- */
+    .label {
+        @apply mb-1.5 block text-sm font-medium text-slate-700;
+    }
+    .input {
+        @apply block min-h-[44px] w-full rounded-[10px] border border-slate-300 bg-white px-3.5 py-3
+        text-base text-slate-900 placeholder:text-slate-500
+        focus:border-primary-500 focus:ring-4 focus:ring-primary-500/15;
+    }
+    .input-error {
+        @apply border-danger bg-[#fff7f7] focus:border-danger focus:ring-danger/15;
+    }
+    .help-text {
+        @apply mt-1 text-sm text-slate-500;
+    }
+    .field-error {
+        @apply mt-1 flex items-start gap-1 text-sm font-medium text-danger;
+    }
+    .required-mark {
+        @apply text-danger;
+    }
+
+    /* ---- Cards ---- */
+    .card {
+        @apply rounded-[18px] border border-slate-200 bg-white p-6 shadow-soft;
+    }
+    .card-dash {
+        @apply rounded-[16px] border border-slate-200 bg-white p-5;
+    }
+    .card-console {
+        @apply rounded-[24px] border border-white/15 bg-slate-900/[0.86] p-6 text-white shadow-dark;
+    }
+
+    /* ---- Status badges (colour + text, never colour alone) ---- */
+    .badge {
+        @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold;
+    }
+    .badge-success { background: var(--color-success-bg); color: #166534; }
+    .badge-warning { background: var(--color-warning-bg); color: #92400e; }
+    .badge-danger  { background: var(--color-danger-bg);  color: #991b1b; }
+    .badge-info    { background: var(--color-info-bg);    color: #075985; }
+    .badge-primary { background: var(--color-primary-100); color: #1d4ed8; }
+    .badge-neutral { @apply bg-slate-100 text-slate-700; }
+    .badge-dot { @apply h-1.5 w-1.5 rounded-full bg-current; }
+
+    /* ---- Alerts ---- */
+    .alert { @apply rounded-[14px] border p-4 text-sm; }
+    .alert-success { background: var(--color-success-bg); border-color: #86efac; color: #166534; }
+    .alert-warning { background: var(--color-warning-bg); border-color: #fcd34d; color: #92400e; }
+    .alert-danger  { background: var(--color-danger-bg);  border-color: #fca5a5; color: #991b1b; }
+    .alert-info    { background: var(--color-info-bg);    border-color: #7dd3fc; color: #075985; }
+
+    /* ---- Tables ---- */
+    .table-wrap {
+        @apply overflow-hidden rounded-[16px] border border-slate-200 bg-white;
+    }
+    .table-base {
+        @apply w-full text-left text-sm;
+    }
+    .table-base thead {
+        @apply bg-slate-50 text-slate-700;
+    }
+    .table-base th {
+        @apply px-4 py-3 text-sm font-semibold;
+    }
+    .table-base td {
+        @apply border-t border-slate-200 px-4 py-3 align-middle;
+    }
+
+    /* ---- Hero gradient ---- */
+    .hero-gradient {
+        background: linear-gradient(135deg, #07111f 0%, #0b1b33 55%, #102a4c 100%);
+    }
+
+    .nav-link {
+        @apply rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-primary-600;
+    }
+    .nav-link-active {
+        @apply bg-primary-50 text-primary-600;
+    }
+}

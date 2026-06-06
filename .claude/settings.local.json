@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(php artisan *)",
+      "Bash(./vendor/bin/phpunit --filter test_invalid_domain_is_rejected_with_validation_error tests/Feature/DomainSearchTest.php)",
+      "Bash(curl -s -o /tmp/resp.txt -w \"HTTP %{http_code}\\\\n\" -X POST http://127.0.0.1:8421/domains/search -H \"Accept: application/json\" -H \"Content-Type: application/json\" -H \"X-Requested-With: XMLHttpRequest\" -d '{\"domain\":\"not a domain\"}')",
+      "Read(//tmp/**)",
+      "Bash(pkill -f \"artisan serve --port=8421\")",
+      "Bash(./vendor/bin/phpunit --filter test_invalid_domain_is_rejected_with_validation_error tests/Feature/DomainSearchTest.php --log-junit /tmp/junit.xml)",
+      "Bash(composer require *)",
+      "Bash(pkill -f \"artisan serve --port=8777\")",
+      "Bash(mkdir -p .claude)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(gh auth *)",
+      "Bash(grep -nE \"^/?\\\\.env$|^/?vendor|^/?node_modules|/storage/|public/build|public/hot\" .gitignore)",
+      "Bash(git config *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(grep -E \"^\\(vendor|node_modules|\\\\.env$|public/build\\)\")",
+      "Bash(awk '{print \"git dir size: \"$1}')"
+    ]
+  }
+}
