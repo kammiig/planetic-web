@@ -26,6 +26,9 @@ Route::post('/contact', [ContactController::class, 'store'])
     ->middleware('throttle:6,1')
     ->name('contact.store');
 
+// SEO
+Route::get('/sitemap.xml', [\App\Http\Controllers\Public\SeoController::class, 'sitemap'])->name('sitemap');
+
 // Legal pages
 Route::get('/privacy-policy', [LegalController::class, 'privacy'])->name('legal.privacy');
 Route::get('/terms', [LegalController::class, 'terms'])->name('legal.terms');
@@ -56,9 +59,13 @@ Route::prefix('cart')->name('cart.')->group(function () {
 */
 Route::prefix('checkout')->name('checkout.')->group(function () {
     Route::get('/', [CheckoutController::class, 'index'])->name('index');
-    Route::post('/start', [CheckoutController::class, 'start'])
+
+    // On-site payment: creates/reuses the order + Stripe PaymentIntent and
+    // returns its client_secret. Auth + verified email required before paying.
+    Route::post('/payment-intent', [CheckoutController::class, 'paymentIntent'])
         ->middleware(['auth', 'verified', 'throttle:10,1'])
-        ->name('start');
+        ->name('payment-intent');
+
     Route::get('/success', [CheckoutController::class, 'success'])->name('success');
     Route::get('/cancel', [CheckoutController::class, 'cancel'])->name('cancel');
 });

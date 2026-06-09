@@ -12,7 +12,7 @@
         <x-field name="email" label="Email address" type="email" autocomplete="email"
                  :value="old('email', $request->email)" :required="true" />
         <x-field name="password" label="New password" type="password" autocomplete="new-password" :required="true"
-                 help="At least 10 characters with upper &amp; lower case, a number and a symbol." />
+                 help="At least 10 characters with upper & lower case, a number and a symbol." />
         <x-field name="password_confirmation" label="Confirm new password" type="password" autocomplete="new-password" :required="true" />
 
         <button type="submit" class="btn-primary w-full">Reset password</button>

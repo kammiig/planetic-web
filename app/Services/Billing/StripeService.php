@@ -4,8 +4,10 @@ namespace App\Services\Billing;
 
 use App\Models\Order;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Stripe\Checkout\Session;
 use Stripe\Event;
+use Stripe\PaymentIntent;
 use Stripe\StripeClient;
 use Stripe\Webhook;
 
@@ -75,6 +77,78 @@ class StripeService
                 'metadata' => ['order_id' => (string) $order->id],
             ],
         ]);
+    }
+
+    /**
+     * Create (or safely reuse) a PaymentIntent for an order so payment can be
+     * taken on-site with the Stripe Payment Element. The secret key never leaves
+     * the backend; only the returned client_secret is exposed to the browser.
+     *
+     * Idempotency is layered:
+     *  - We persist the intent id on the order and reuse it while it is still
+     *    payable, so a page refresh or repeated AJAX call never spawns a second
+     *    intent (and therefore never a duplicate charge or duplicate order).
+     *  - The create call also carries a deterministic idempotency key as a
+     *    backstop against a concurrent double-submit.
+     * The order id travels in metadata so the verified webhook can reconcile the
+     * payment and trigger provisioning — never the browser.
+     */
+    public function createOrReusePaymentIntent(Order $order): PaymentIntent
+    {
+        $client = $this->client();
+        $customerId = $this->ensureCustomer($order->user);
+        $amount = $this->minorAmount((float) $order->total);
+        $currency = config('stripe.currency', 'gbp');
+
+        // Reuse an existing intent for this order while it can still be paid.
+        if (filled($order->stripe_payment_intent_id)) {
+            try {
+                $intent = $client->paymentIntents->retrieve($order->stripe_payment_intent_id);
+
+                $payable = in_array($intent->status, [
+                    'requires_payment_method', 'requires_confirmation', 'requires_action', 'processing',
+                ], true);
+
+                if ($payable) {
+                    // Keep the amount in sync if the basket changed while still editable.
+                    if ((int) $intent->amount !== $amount
+                        && in_array($intent->status, ['requires_payment_method', 'requires_confirmation'], true)) {
+                        $intent = $client->paymentIntents->update($intent->id, ['amount' => $amount]);
+                    }
+
+                    return $intent;
+                }
+            } catch (\Throwable $e) {
+                Log::channel('stack')->warning('Could not reuse Stripe PaymentIntent; creating a fresh one.', [
+                    'order' => $order->order_number,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $intent = $client->paymentIntents->create([
+            'amount' => $amount,
+            'currency' => $currency,
+            'customer' => $customerId,
+            'description' => config('app.name').' order '.$order->order_number,
+            'metadata' => [
+                'order_id' => (string) $order->id,
+                'order_number' => $order->order_number,
+            ],
+            'automatic_payment_methods' => ['enabled' => true],
+        ], [
+            'idempotency_key' => 'pi_order_'.$order->id,
+        ]);
+
+        $order->forceFill(['stripe_payment_intent_id' => $intent->id])->save();
+
+        return $intent;
+    }
+
+    /** Convert a major-unit amount (e.g. pounds) to Stripe's minor units (pence). */
+    public function minorAmount(float $amount): int
+    {
+        return (int) round($amount * 100);
     }
 
     /**

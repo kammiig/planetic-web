@@ -3,9 +3,10 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\VerifyEmail;
+use App\Notifications\VerifyEmailNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Mockery;
 use Tests\TestCase;
 
 class RegistrationTest extends TestCase
@@ -38,7 +39,22 @@ class RegistrationTest extends TestCase
         $this->assertTrue($user->isCustomer());
         $this->assertNull($user->email_verified_at);
 
-        Notification::assertSentTo($user, VerifyEmail::class);
+        // We send a branded verification notification (extends Laravel's VerifyEmail).
+        Notification::assertSentTo($user, VerifyEmailNotification::class);
+    }
+
+    /**
+     * Regression: a failing mail transport must never turn registration into a
+     * 500. The send is wrapped in a try/catch that logs and returns false.
+     */
+    public function test_verification_send_failure_is_swallowed_and_reported(): void
+    {
+        $this->seedRoles();
+
+        $user = Mockery::mock(User::class)->makePartial();
+        $user->shouldReceive('notify')->andThrow(new \RuntimeException('SMTP unavailable'));
+
+        $this->assertFalse($user->sendEmailVerificationNotification());
     }
 
     public function test_weak_passwords_are_rejected(): void

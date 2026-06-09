@@ -51,7 +51,11 @@ class AccountSettingsController extends Controller
         $user->save();
 
         if ($emailChanged) {
-            $user->sendEmailVerificationNotification();
+            $sent = $user->sendEmailVerificationNotification();
+
+            return back()->with('success', $sent
+                ? 'Your account details have been updated. Please check your new email address for a verification link.'
+                : 'Your account details have been updated, but we could not send the verification email just now — please use “Resend verification email” shortly.');
         }
 
         return back()->with('success', 'Your account details have been updated.');

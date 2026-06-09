@@ -1,5 +1,6 @@
 @extends('layouts.public')
 @section('title', 'Privacy Policy')
+@section('meta_description', 'How Planetic Web collects, uses, stores and protects your personal data.')
 
 @section('content')
     <x-legal title="Privacy Policy" updated="{{ now()->format('F Y') }}">

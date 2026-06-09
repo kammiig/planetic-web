@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\RoleName;
+use App\Notifications\VerifyEmailNotification;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 {
@@ -108,6 +110,38 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         $roleModel = Role::where('name', $name)->firstOrFail();
         $this->roles()->syncWithoutDetaching([$roleModel->id]);
         $this->unsetRelation('roles');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Email verification
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Send the branded email-verification notification.
+     *
+     * Wrapped in a try/catch so a mail/SMTP failure can never bubble up as a
+     * 500 during registration, a resend, or an email change — the account is
+     * already created and the customer can simply resend. Failures are logged
+     * for admins. Returns true only when the notification dispatched cleanly,
+     * so callers can show an honest success/failure message.
+     */
+    public function sendEmailVerificationNotification(): bool
+    {
+        try {
+            $this->notify(new VerifyEmailNotification());
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::channel('stack')->error('Email verification notification failed to send', [
+                'user_id' => $this->getKey(),
+                'email' => $this->email,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /*

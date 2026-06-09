@@ -1,6 +1,7 @@
 @extends('layouts.public')
 
 @section('title', 'Contact Us')
+@section('meta_description', 'Get in touch with Planetic Web for help with domains, hosting, DNS or your bespoke website project. Friendly, UK-based support.')
 
 @section('content')
     <section class="container-px py-16">

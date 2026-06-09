@@ -14,7 +14,7 @@
         <x-field name="phone" label="Phone number" type="tel" autocomplete="tel" help="Optional. Used for order and support contact." />
         <x-field name="company_name" label="Company name" autocomplete="organization" help="Optional." />
         <x-field name="password" label="Password" type="password" autocomplete="new-password" :required="true"
-                 help="At least 10 characters with upper &amp; lower case, a number and a symbol." />
+                 help="At least 10 characters with upper & lower case, a number and a symbol." />
         <x-field name="password_confirmation" label="Confirm password" type="password" autocomplete="new-password" :required="true" />
 
         <div class="flex items-start gap-3">

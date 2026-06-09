@@ -1,6 +1,7 @@
 @extends('layouts.public')
 
 @section('title', 'Premium Hosting, Domains & Bespoke Websites')
+@section('meta_description', 'UK domains, fast cPanel hosting, and a complete bespoke website for £200 with a free domain and hosting for the first year — built, secured and managed for you by Planetic Web.')
 
 @section('content')
     {{-- Hero --}}
@@ -134,13 +135,30 @@
     <section class="bg-slate-50 py-16">
         <div class="container-px mx-auto max-w-3xl">
             <h2 class="text-center text-3xl font-bold">Frequently asked questions</h2>
-            <div class="mt-8 space-y-3" x-data="{ open: null }">
-                @foreach ([
+            @php
+                $faqs = [
                     ['Is the domain and hosting really free?', 'Yes — with the £200 website package your domain and hosting are free for the first year. Renewal applies after the first year at standard rates.'],
                     ['How fast will my website be ready?', 'Once you complete the short intake form and provide your content, our team begins straight away. Most sites are ready within a couple of weeks.'],
                     ['Do you set up email and SSL?', 'Yes. We configure SSL, DNS and email records (SPF, DKIM, DMARC) for you automatically through Cloudflare and cPanel.'],
                     ['Can I pay monthly for hosting?', 'Yes. Hosting plans are available monthly or yearly, and you can upgrade at any time.'],
-                ] as $i => [$q, $a])
+                ];
+                $faqSchema = [
+                    '@context' => 'https://schema.org',
+                    '@type' => 'FAQPage',
+                    'mainEntity' => array_map(fn ($f) => [
+                        '@type' => 'Question',
+                        'name' => $f[0],
+                        'acceptedAnswer' => ['@type' => 'Answer', 'text' => $f[1]],
+                    ], $faqs),
+                ];
+            @endphp
+
+            @push('head')
+                <script type="application/ld+json">{!! json_encode($faqSchema, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) !!}</script>
+            @endpush
+
+            <div class="mt-8 space-y-3" x-data="{ open: null }">
+                @foreach ($faqs as $i => [$q, $a])
                     <div class="card-dash">
                         <h3>
                             <button type="button" @click="open === {{ $i }} ? open = null : open = {{ $i }}"

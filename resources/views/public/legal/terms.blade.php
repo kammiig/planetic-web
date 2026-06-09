@@ -1,5 +1,6 @@
 @extends('layouts.public')
 @section('title', 'Terms of Use')
+@section('meta_description', 'The terms that govern your use of Planetic Web’s domain, hosting and website development services.')
 
 @section('content')
     <x-legal title="Terms of Use" updated="{{ now()->format('F Y') }}">

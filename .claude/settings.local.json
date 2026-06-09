@@ -19,7 +19,26 @@
       "Bash(git init *)",
       "Bash(git add *)",
       "Bash(grep -E \"^\\(vendor|node_modules|\\\\.env$|public/build\\)\")",
-      "Bash(awk '{print \"git dir size: \"$1}')"
+      "Bash(awk '{print \"git dir size: \"$1}')",
+      "Bash(grep -niA30 \"deploy\\\\|cpanel\\\\|production\" README.md)",
+      "Bash(grep -E \"^\\\\.env$|\\\\.env\\\\.production|auth\\\\.json|\\\\.env\\\\.backup\")",
+      "Bash(grep -iE \"\\\\.\\(pem|key|p12\\)$|secret|credential\")",
+      "Bash(rm -rf /private/tmp/claude-501/node-compile-cache)",
+      "Bash(mkdir -p storage/logs)",
+      "Bash(vendor/bin/phpunit --no-coverage)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(ls vendor/bin/)",
+      "Bash(ls -la vendor/phpunit/phpunit/phpunit)",
+      "Bash(composer --version)",
+      "Bash(composer install *)",
+      "Bash(echo \"composer exit=$?\")",
+      "Bash(echo \"build exit=$?\")",
+      "Bash(./vendor/bin/phpunit --no-coverage)",
+      "Bash(echo \"phpunit exit=$?\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8777/)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8777__TRACKED_VAR__)",
+      "Bash(rm -f storage/app/demo-setup.php)",
+      "Bash(grep -vE \"storage/logs|\\\\.env$|settings.local\")"
     ]
   }
 }

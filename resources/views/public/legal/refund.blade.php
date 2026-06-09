@@ -1,5 +1,6 @@
 @extends('layouts.public')
 @section('title', 'Refund Policy')
+@section('meta_description', 'Planetic Web’s refund policy for domains, hosting and bespoke website packages.')
 
 @section('content')
     <x-legal title="Refund Policy" updated="{{ now()->format('F Y') }}">

@@ -1,5 +1,6 @@
 @extends('layouts.public')
 @section('title', 'Renewal Policy')
+@section('meta_description', 'How domain and hosting renewals work at Planetic Web after the free first year.')
 
 @section('content')
     <x-legal title="Renewal Policy" updated="{{ now()->format('F Y') }}">

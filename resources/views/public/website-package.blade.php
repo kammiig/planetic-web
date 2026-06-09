@@ -3,6 +3,27 @@
 @section('title', 'Complete Bespoke Website for £200')
 @section('meta_description', 'A complete bespoke website for £200, with free domain and hosting for the first year. Renewal applies after the first year.')
 
+@php
+    $productSchema = [
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Complete Bespoke Website',
+        'description' => 'A complete bespoke business website with a free domain and hosting for the first year, basic SEO and Cloudflare setup, built and managed by Planetic Web.',
+        'brand' => ['@type' => 'Brand', 'name' => config('app.name')],
+        'offers' => [
+            '@type' => 'Offer',
+            'price' => number_format((float) ($price ?? 200), 2, '.', ''),
+            'priceCurrency' => 'GBP',
+            'availability' => 'https://schema.org/InStock',
+            'url' => route('website-package'),
+        ],
+    ];
+@endphp
+
+@push('head')
+    <script type="application/ld+json">{!! json_encode($productSchema, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) !!}</script>
+@endpush
+
 @section('content')
     {{-- Hero offer --}}
     <section class="hero-gradient text-white">

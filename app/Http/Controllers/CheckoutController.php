@@ -19,68 +19,82 @@ class CheckoutController extends Controller
 {
     public function __construct(private readonly CartService $cart) {}
 
-    public function index(): View|RedirectResponse
+    /**
+     * Render the multi-step, on-site checkout. Payment is taken here with the
+     * Stripe Payment Element — the customer is never redirected to a hosted page.
+     */
+    public function index(Request $request): View|RedirectResponse
     {
         $cart = $this->cart->currentCart()->load('items');
+        $pendingOrder = $this->pendingCheckoutOrder($request);
 
-        if ($cart->items->isEmpty()) {
+        if ($cart->items->isEmpty() && ! $pendingOrder) {
             return redirect()->route('cart.index')->with('info', 'Your cart is empty.');
         }
 
+        // Prefer the live cart; fall back to an in-progress order (e.g. after a
+        // refresh mid-payment, once the cart has already been converted).
+        $usingOrder = $cart->items->isEmpty() && $pendingOrder;
+
         return view('checkout.checkout', [
-            'cart' => $cart,
+            'lineItems' => $usingOrder ? $pendingOrder->items : $cart->items,
+            'total' => $usingOrder ? (float) $pendingOrder->total : (float) $cart->total,
             'freeYearNotice' => config('billing.website_package.free_year_notice'),
+            'publishableKey' => (string) config('stripe.public_key'),
         ]);
     }
 
-    public function start(CheckoutRequest $request, CreateOrderFromCart $createOrder, StripeService $stripe): JsonResponse|RedirectResponse
+    /**
+     * AJAX: validate billing, create (or reuse) the order and a PaymentIntent,
+     * and return the client_secret so the browser can confirm payment on-site.
+     * The secret key stays on the backend; only the client_secret is returned.
+     */
+    public function paymentIntent(CheckoutRequest $request, CreateOrderFromCart $createOrder, StripeService $stripe): JsonResponse
     {
-        $user = $request->user();
-        $cart = $this->cart->currentCart()->load('items');
+        // Persist billing details to the customer's profile.
+        $request->user()->update($request->billingData());
 
-        if ($cart->items->isEmpty()) {
-            return redirect()->route('cart.index')->with('error', 'Your cart is empty.');
+        $order = $this->resolveCheckoutOrder($request, $createOrder);
+
+        if (! $order) {
+            return response()->json([
+                'error' => 'Your cart is empty. Please add a product before paying.',
+            ], 422);
         }
 
-        // Persist billing details to the customer's profile.
-        $user->update($request->billingData());
-
-        $order = $createOrder->handle($cart, $user);
-
         try {
-            $session = $stripe->createCheckoutSession($order);
-            $order->update(['stripe_checkout_session_id' => $session->id]);
+            $intent = $stripe->createOrReusePaymentIntent($order);
         } catch (Throwable $e) {
-            Log::channel('stack')->error('Stripe checkout session creation failed', [
+            Log::channel('stack')->error('Stripe PaymentIntent creation failed', [
                 'order' => $order->order_number,
                 'error' => $e->getMessage(),
             ]);
 
-            $order->update(['status' => OrderStatus::Failed->value]);
-
-            return redirect()->route('checkout.index')
-                ->with('error', 'We could not start secure checkout right now. Please try again in a few moments.');
-        }
-
-        if ($request->expectsJson()) {
             return response()->json([
-                'success' => true,
-                'checkout_url' => $session->url,
-                'stripe_checkout_session_id' => $session->id,
-            ]);
+                'error' => 'We could not start secure payment right now. Please try again in a few moments.',
+            ], 502);
         }
 
-        return redirect()->away($session->url);
+        return response()->json([
+            'client_secret' => $intent->client_secret,
+            'publishable_key' => (string) config('stripe.public_key'),
+            'order_number' => $order->order_number,
+            'amount' => (float) $order->total,
+            'currency' => strtoupper((string) $order->currency),
+        ]);
     }
 
+    /**
+     * Confirmation page. NEVER provisions — provisioning happens only after the
+     * verified webhook. This page simply reflects the order's backend status.
+     */
     public function success(Request $request): View
     {
-        // The success page NEVER provisions — it only reflects backend status.
-        $order = null;
-        if ($sessionId = $request->query('session_id')) {
-            $order = Order::where('stripe_checkout_session_id', $sessionId)
-                ->when($request->user(), fn ($q) => $q->where('user_id', $request->user()->id))
-                ->first();
+        $order = $this->locateOrderForConfirmation($request);
+
+        if ($order) {
+            // Start a fresh checkout next time — this order is now with Stripe.
+            $request->session()->forget('checkout_order_id');
         }
 
         return view('checkout.success', ['order' => $order]);
@@ -89,5 +103,71 @@ class CheckoutController extends Controller
     public function cancel(): View
     {
         return view('checkout.cancel');
+    }
+
+    /**
+     * The pending, unpaid order already started in this checkout session, if any.
+     * Lets a refresh or repeated request reuse the same order + PaymentIntent
+     * instead of creating duplicates.
+     */
+    private function pendingCheckoutOrder(Request $request): ?Order
+    {
+        if (! $request->user()) {
+            return null;
+        }
+
+        $orderId = $request->session()->get('checkout_order_id');
+
+        if (! $orderId) {
+            return null;
+        }
+
+        $order = Order::with('items')
+            ->where('id', $orderId)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if (! $order || $order->isPaid() || $order->status === OrderStatus::Cancelled) {
+            return null;
+        }
+
+        return $order;
+    }
+
+    private function resolveCheckoutOrder(CheckoutRequest $request, CreateOrderFromCart $createOrder): ?Order
+    {
+        if ($existing = $this->pendingCheckoutOrder($request)) {
+            return $existing;
+        }
+
+        $cart = $this->cart->currentCart()->load('items');
+
+        if ($cart->items->isEmpty()) {
+            return null;
+        }
+
+        $order = $createOrder->handle($cart, $request->user());
+        $request->session()->put('checkout_order_id', $order->id);
+
+        return $order;
+    }
+
+    private function locateOrderForConfirmation(Request $request): ?Order
+    {
+        $userId = $request->user()?->id;
+
+        if ($paymentIntent = $request->query('payment_intent')) {
+            return Order::where('stripe_payment_intent_id', $paymentIntent)
+                ->when($userId, fn ($q) => $q->where('user_id', $userId))
+                ->first();
+        }
+
+        if ($sessionId = $request->query('session_id')) {
+            return Order::where('stripe_checkout_session_id', $sessionId)
+                ->when($userId, fn ($q) => $q->where('user_id', $userId))
+                ->first();
+        }
+
+        return null;
     }
 }
