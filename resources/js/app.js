@@ -67,16 +67,24 @@ Alpine.data('checkout', (config = {}) => ({
         this.step = 0;
         this.announceStep();
     },
+    goTo(index) {
+        // Allow jumping back to an already-completed step (never skipping ahead).
+        if (index >= 0 && index <= this.step) {
+            this.step = index;
+            this.formError = '';
+            this.announceStep();
+        }
+    },
 
     announceStep() {
-        // Move focus to the new step's heading so screen-reader and keyboard
-        // users are taken to the right place. Deferred so the step is visible
-        // (x-show) before we focus it.
+        // Move focus to the newly-revealed step panel (labelled via aria-label)
+        // so screen-reader and keyboard users are taken to the right place and
+        // focus never gets stranded on a now-hidden element. Deferred so the
+        // panel is visible (x-show) before we focus it.
         setTimeout(() => {
-            const heading = this.$root.querySelector('[data-step="' + this.currentStep + '"] [data-step-heading]');
-            if (heading) {
-                heading.setAttribute('tabindex', '-1');
-                heading.focus({ preventScroll: false });
+            const panel = this.$root.querySelector('[data-step="' + this.currentStep + '"]');
+            if (panel) {
+                panel.focus({ preventScroll: false });
             }
         }, 60);
     },
@@ -207,6 +215,95 @@ Alpine.data('checkout', (config = {}) => ({
                 if (el) el.focus();
             }
         });
+    },
+}));
+
+/*
+|--------------------------------------------------------------------------
+| Domain search page
+|--------------------------------------------------------------------------
+| Drives the full domain-search experience (exact match + bundle cards +
+| "more options" list). Calls only the Laravel search endpoint (never the
+| registrar directly) and adds results to the cart server-side.
+*/
+Alpine.data('domainSearch', (config = {}) => ({
+    query: config.initialQuery || '',
+    searchUrl: config.searchUrl,
+    cartUrl: config.cartUrl,
+    cartIndexUrl: config.cartIndexUrl,
+    websitePackagePrice: config.websitePackagePrice || 200,
+    loading: false,
+    error: '',
+    result: null,
+    alternatives: [],
+    sort: 'popularity',
+    adding: null,
+
+    get bundleDomain() {
+        if (this.result && this.result.available) return this.result.domain;
+        if (this.alternatives.length) return this.alternatives[0].domain;
+        return this.result ? this.result.domain : '';
+    },
+    get sortedAlternatives() {
+        const list = [...this.alternatives];
+        if (this.sort === 'price-asc') return list.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+        if (this.sort === 'price-desc') return list.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+        return list;
+    },
+    csrf() {
+        const m = document.querySelector('meta[name="csrf-token"]');
+        return m ? m.getAttribute('content') : '';
+    },
+
+    async search() {
+        const domain = (this.query || '').trim().toLowerCase();
+        this.error = '';
+        if (!domain) { this.error = 'Please enter a domain name to search.'; return; }
+
+        this.loading = true;
+        this.result = null;
+        this.alternatives = [];
+        try {
+            const res = await fetch(this.searchUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf() },
+                body: JSON.stringify({ domain, full: true }),
+            });
+            const data = await res.json();
+            if (!res.ok || data.success === false) {
+                this.error = data.message || 'We could not check this domain right now. Please try again in a few moments.';
+            } else {
+                this.result = data;
+                this.alternatives = data.alternatives && data.alternatives.length ? data.alternatives : (data.suggestions || []);
+            }
+        } catch (e) {
+            this.error = 'We could not check this domain right now. Please try again in a few moments.';
+        } finally {
+            this.loading = false;
+        }
+    },
+
+    async add(itemType, domain, key) {
+        this.adding = key;
+        this.error = '';
+        try {
+            const res = await fetch(this.cartUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf() },
+                body: JSON.stringify({ item_type: itemType, domain_name: domain }),
+            });
+            if (res.ok) {
+                window.location = this.cartIndexUrl;
+                return;
+            }
+            const body = await res.json().catch(() => ({}));
+            const firstError = body.errors ? Object.values(body.errors)[0] : null;
+            this.error = (firstError && firstError[0]) || body.message || 'We could not add that to your cart. Please try again.';
+        } catch (e) {
+            this.error = 'We could not add that to your cart. Please try again.';
+        } finally {
+            this.adding = null;
+        }
     },
 }));
 

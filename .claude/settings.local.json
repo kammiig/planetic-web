@@ -38,7 +38,11 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8777/)",
       "Bash(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8777__TRACKED_VAR__)",
       "Bash(rm -f storage/app/demo-setup.php)",
-      "Bash(grep -vE \"storage/logs|\\\\.env$|settings.local\")"
+      "Bash(grep -vE \"storage/logs|\\\\.env$|settings.local\")",
+      "Bash(echo \"build=$?\")",
+      "Bash(echo \"phpunit=$?\")",
+      "Bash(grep -vE \"storage/logs|public/build|\\\\.env$\")",
+      "Bash(grep -vE \"storage/logs|public/build|\\\\.env$|settings.local|\\\\.phpunit\")"
     ]
   }
 }

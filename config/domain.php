@@ -69,7 +69,7 @@ return [
     |
     */
 
-    'suggestion_tlds' => ['co.uk', 'com', 'net', 'org', 'io', 'uk'],
+    'suggestion_tlds' => ['co.uk', 'com', 'net', 'org', 'io', 'uk', 'co', 'shop', 'online', 'store'],
 
     'request_timeout' => (int) env('DOMAIN_REQUEST_TIMEOUT', 30),
 

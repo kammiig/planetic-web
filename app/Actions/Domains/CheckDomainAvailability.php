@@ -22,11 +22,11 @@ class CheckDomainAvailability
     ) {}
 
     /**
-     * @return array{success: bool, domain: string, available: bool, premium: bool, price: ?string, currency: string, suggestions: array<int, array{domain: string, available: bool, price: string}>}
+     * @return array{success: bool, domain: string, available: bool, premium: bool, price: ?string, currency: string, suggestions: array<int, array{domain: string, available: bool, price: string}>, alternatives: array<int, array{domain: string, available: bool, price: string}>}
      *
      * @throws RegistrarException
      */
-    public function handle(string $domain): array
+    public function handle(string $domain, bool $withAlternatives = false): array
     {
         $domain = DomainName::normalise($domain);
         $result = $this->lookup($domain);
@@ -39,8 +39,54 @@ class CheckDomainAvailability
             'premium' => $result['premium'],
             'price' => $result['available'] ? $price : null,
             'currency' => 'GBP',
+            // Kept for the homepage hero (only when the exact name is taken).
             'suggestions' => $result['available'] ? [] : $this->suggestions($domain, $price),
+            // A richer set of available alternative TLDs for the full search page.
+            // Guarded so the lightweight hero search does not pay the extra lookups.
+            'alternatives' => $withAlternatives ? $this->alternatives($domain, $price) : [],
         ];
+    }
+
+    /**
+     * Up to 8 available alternative-TLD variants for the "More options" list.
+     * Bounded to keep registrar calls (and latency) in check; all results are
+     * cached for 60s so repeat searches are instant.
+     *
+     * @return array<int, array{domain: string, available: bool, price: string}>
+     */
+    private function alternatives(string $domain, string $price): array
+    {
+        $parsed = DomainName::parse($domain);
+        $out = [];
+        $checked = 0;
+
+        foreach (config('domain.suggestion_tlds', []) as $tld) {
+            if (count($out) >= 8 || $checked >= 10) {
+                break;
+            }
+            if ($tld === $parsed->tld) {
+                continue;
+            }
+
+            $candidate = $parsed->sld.'.'.$tld;
+            $checked++;
+
+            try {
+                $check = Cache::remember(
+                    'domain-availability:'.$candidate,
+                    now()->addSeconds(60),
+                    fn () => $this->registrar->checkAvailability($candidate),
+                );
+            } catch (RegistrarException) {
+                continue;
+            }
+
+            if (! empty($check['available'])) {
+                $out[] = ['domain' => $candidate, 'available' => true, 'price' => $price];
+            }
+        }
+
+        return $out;
     }
 
     /**

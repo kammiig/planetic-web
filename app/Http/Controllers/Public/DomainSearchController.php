@@ -14,7 +14,10 @@ class DomainSearchController extends Controller
 {
     public function index(): View
     {
-        return view('public.domain-search');
+        return view('public.domain-search', [
+            'websitePackagePrice' => (float) config('billing.website_package.price', 200),
+            'freeYearNotice' => config('billing.website_package.free_year_notice'),
+        ]);
     }
 
     /**
@@ -27,7 +30,7 @@ class DomainSearchController extends Controller
         $domain = $request->validated()['domain'];
 
         try {
-            return response()->json($action->handle($domain));
+            return response()->json($action->handle($domain, $request->boolean('full')));
         } catch (RegistrarException $e) {
             Log::channel('stack')->warning('Domain search failed', [
                 'domain' => $domain,

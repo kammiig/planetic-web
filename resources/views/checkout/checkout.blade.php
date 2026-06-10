@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'Secure checkout')
+@section('title', "Let's complete your purchase")
 @section('meta_description', 'Complete your Planetic Web order securely. Pay on-site with card — your domain, hosting and website are set up automatically after payment.')
 
 @push('head')
@@ -12,43 +12,65 @@
 @section('content')
     <section class="bg-slate-50 py-10 sm:py-14">
         <div class="container-px">
-            <nav aria-label="Breadcrumb" class="text-sm">
-                <ol class="flex items-center gap-2 text-slate-500">
-                    <li><a href="{{ route('cart.index') }}" class="hover:text-primary-600 hover:underline">Cart</a></li>
-                    <li aria-hidden="true">/</li>
-                    <li class="font-medium text-slate-700" aria-current="page">Checkout</li>
-                </ol>
-            </nav>
-
-            <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold sm:text-3xl">Secure checkout</h1>
-                    <p class="mt-1 text-sm text-slate-600">Complete your order safely — payment happens right here on the page.</p>
-                </div>
-                <p class="inline-flex items-center gap-2 text-sm font-medium text-slate-500">
-                    <svg class="h-4 w-4 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    256-bit SSL encrypted · Powered by Stripe
-                </p>
+            {{-- Centered header --}}
+            <div class="mx-auto max-w-2xl text-center">
+                <nav aria-label="Breadcrumb" class="text-sm">
+                    <ol class="flex items-center justify-center gap-2 text-slate-500">
+                        <li><a href="{{ route('cart.index') }}" class="hover:text-primary-600 hover:underline">Cart</a></li>
+                        <li aria-hidden="true">/</li>
+                        <li class="font-medium text-slate-700" aria-current="page">Checkout</li>
+                    </ol>
+                </nav>
+                <h1 class="mt-4 text-3xl font-extrabold sm:text-4xl">Let's complete your purchase</h1>
+                <p class="mt-2 text-slate-600">Almost there! Create or sign into your account and enter your billing details.</p>
             </div>
 
-            <div class="mt-8 grid gap-8 lg:grid-cols-3">
-                {{-- ===================== LEFT: steps ===================== --}}
-                <div class="order-2 lg:order-1 lg:col-span-2">
-                    @guest
-                        {{-- Step 1: sign up / sign in --}}
-                        <div class="card">
-                            <span class="badge badge-primary">Step 1 of 3</span>
-                            <h2 class="mt-3 text-xl font-bold">Sign in or create your account</h2>
-                            <p class="mt-1 text-sm text-slate-600">You'll need an account to complete your order and manage your domain, hosting and website afterwards.</p>
-                            <div class="mt-5 flex flex-col gap-3 sm:flex-row">
-                                <a href="{{ route('register') }}?intended={{ urlencode(route('checkout.index')) }}" class="btn-primary sm:flex-1">Create an account</a>
-                                <a href="{{ route('login') }}?intended={{ urlencode(route('checkout.index')) }}" class="btn-secondary sm:flex-1">I already have an account</a>
+            @guest
+                {{-- ===================== GUEST ===================== --}}
+                <div class="mx-auto mt-10 grid max-w-5xl gap-6 lg:grid-cols-3">
+                    <div class="space-y-3 lg:col-span-2">
+                        {{-- Step 1: Sign up / sign in (active) --}}
+                        <div class="rounded-[14px] border border-primary-500 bg-white shadow-soft">
+                            <div class="flex items-center justify-between gap-4 px-5 py-4">
+                                <div class="flex items-center gap-3">
+                                    <span class="grid h-7 w-7 place-items-center rounded-full bg-primary-500 text-sm font-bold text-white">1</span>
+                                    <h2 class="text-base font-bold">Sign up</h2>
+                                </div>
+                                <p class="text-sm text-slate-500">Already have an account?
+                                    <a href="{{ route('login') }}" class="font-semibold text-primary-600 hover:underline">Sign in</a>
+                                </p>
                             </div>
-                            <p class="mt-4 text-xs text-slate-500">Your cart is saved and will be waiting for you after you sign in.</p>
+                            <div class="border-t border-slate-100 px-5 py-5">
+                                <p class="text-sm text-slate-600">You'll need an account to complete your order and manage your domain, hosting and website afterwards.</p>
+                                <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+                                    <a href="{{ route('register') }}" class="btn-primary sm:flex-1">Create an account</a>
+                                    <a href="{{ route('login') }}" class="btn-secondary sm:flex-1">Sign in</a>
+                                </div>
+                                <p class="mt-4 text-xs text-slate-500">We'll verify your email, so keep your inbox accessible. Your cart is saved and waiting for you after you sign in.</p>
+                            </div>
                         </div>
-                    @else
-                        @if (! auth()->user()->hasVerifiedEmail())
-                            <div class="card">
+
+                        {{-- Collapsed future steps --}}
+                        @foreach (['Confirm your plan', 'Enter your billing address', 'Choose a payment method'] as $i => $label)
+                            <div class="rounded-[14px] border border-slate-200 bg-white px-5 py-4">
+                                <div class="flex items-center gap-3 text-slate-400">
+                                    <span class="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-sm font-bold">{{ $i + 2 }}</span>
+                                    <h2 class="text-base font-semibold">{{ $label }}</h2>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <aside class="lg:col-span-1" aria-label="Order summary">
+                        @include('checkout.partials.summary', ['showPay' => false, 'lineItems' => $lineItems, 'total' => $total, 'freeYearNotice' => $freeYearNotice])
+                    </aside>
+                </div>
+            @else
+                @if (! auth()->user()->hasVerifiedEmail())
+                    {{-- ===================== UNVERIFIED ===================== --}}
+                    <div class="mx-auto mt-10 grid max-w-5xl gap-6 lg:grid-cols-3">
+                        <div class="lg:col-span-2">
+                            <div class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-soft">
                                 <div class="alert alert-warning" role="alert">
                                     <strong class="font-semibold">Please verify your email address before paying.</strong>
                                     <p class="mt-1">We sent a verification link to <span class="font-medium">{{ auth()->user()->email }}</span>.</p>
@@ -58,45 +80,64 @@
                                     <button type="submit" class="btn-primary">Resend verification email</button>
                                 </form>
                             </div>
-                        @else
-                            <div
-                                x-data="checkout(@js([
-                                    'intentUrl' => route('checkout.payment-intent'),
-                                    'successUrl' => route('checkout.success'),
-                                    'publishableKey' => $publishableKey,
-                                    'steps' => ['review', 'billing', 'payment'],
-                                ]))"
-                                x-cloak
-                            >
-                                {{-- Step indicator --}}
-                                <ol class="mb-6 grid grid-cols-3 gap-2" aria-label="Checkout progress">
-                                    @foreach (['review' => 'Review order', 'billing' => 'Billing details', 'payment' => 'Payment'] as $key => $title)
-                                        <li class="flex items-center gap-2 rounded-[10px] border px-3 py-2"
-                                            x-bind:class="isActive('{{ $key }}') ? 'border-primary-500 bg-primary-50' : (isDone('{{ $key }}') ? 'border-success/40 bg-success/5' : 'border-slate-200 bg-white')"
-                                            x-bind:aria-current="isActive('{{ $key }}') ? 'step' : null">
-                                            <span class="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full text-xs font-bold"
-                                                  x-bind:class="isActive('{{ $key }}') ? 'bg-primary-500 text-white' : (isDone('{{ $key }}') ? 'bg-success text-white' : 'bg-slate-200 text-slate-600')">
-                                                <span x-show="!isDone('{{ $key }}')">{{ $loop->iteration }}</span>
-                                                <svg x-show="isDone('{{ $key }}')" x-cloak class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-                                            </span>
-                                            <span class="truncate text-sm font-semibold text-slate-700">{{ $title }}</span>
-                                        </li>
-                                    @endforeach
-                                </ol>
+                        </div>
+                        <aside class="lg:col-span-1" aria-label="Order summary">
+                            @include('checkout.partials.summary', ['showPay' => false, 'lineItems' => $lineItems, 'total' => $total, 'freeYearNotice' => $freeYearNotice])
+                        </aside>
+                    </div>
+                @else
+                    {{-- ===================== AUTHENTICATED + VERIFIED ===================== --}}
+                    <div
+                        x-data="checkout(@js([
+                            'intentUrl' => route('checkout.payment-intent'),
+                            'successUrl' => route('checkout.success'),
+                            'publishableKey' => $publishableKey,
+                            'steps' => ['review', 'billing', 'payment'],
+                        ]))"
+                        x-cloak
+                        class="mx-auto mt-10 grid max-w-5xl gap-6 lg:grid-cols-3"
+                    >
+                        <div class="space-y-3 lg:col-span-2">
+                            {{-- Step 1: Account (complete) --}}
+                            <div class="rounded-[14px] border border-success/40 bg-white px-5 py-4 shadow-soft">
+                                <div class="flex items-center justify-between gap-4">
+                                    <div class="flex items-center gap-3">
+                                        <span class="grid h-7 w-7 place-items-center rounded-full bg-success text-white" aria-hidden="true">
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+                                        </span>
+                                        <div>
+                                            <h2 class="text-base font-bold">Account</h2>
+                                            <p class="text-sm text-slate-500">Signed in as {{ auth()->user()->email }}</p>
+                                        </div>
+                                    </div>
+                                    <form method="POST" action="{{ route('logout') }}">
+                                        @csrf
+                                        <button type="submit" class="text-sm font-medium text-slate-500 hover:text-primary-600 hover:underline">Sign out</button>
+                                    </form>
+                                </div>
+                            </div>
 
-                                {{-- Step: Review --}}
-                                <div data-step="review" x-show="isActive('review')" class="card">
-                                    <h2 data-step-heading class="text-xl font-bold focus:outline-none">Review your order</h2>
-                                    <p class="mt-1 text-sm text-slate-600">Check the services below, then continue to billing.</p>
+                            {{-- Step 2: Confirm your plan --}}
+                            <div class="rounded-[14px] border bg-white shadow-soft transition"
+                                 x-bind:class="isActive('review') ? 'border-primary-500' : 'border-slate-200'">
+                                <button type="button" @click="goTo(0)" class="flex w-full items-center gap-3 px-5 py-4 text-left"
+                                        x-bind:class="isDone('review') ? 'cursor-pointer' : 'cursor-default'">
+                                    <span class="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-sm font-bold"
+                                          x-bind:class="isActive('review') ? 'bg-primary-500 text-white' : (isDone('review') ? 'bg-success text-white' : 'bg-slate-100 text-slate-500')">
+                                        <span x-show="!isDone('review')">2</span>
+                                        <svg x-show="isDone('review')" x-cloak class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                                    </span>
+                                    <h2 data-step-heading class="flex-1 text-base font-bold focus:outline-none">Confirm your plan</h2>
+                                    <span x-show="isDone('review')" x-cloak class="text-sm font-medium text-primary-600">Edit</span>
+                                </button>
 
-                                    <ul class="mt-5 divide-y divide-slate-200">
+                                <div data-step="review" x-show="isActive('review')" x-cloak tabindex="-1" aria-label="Confirm your plan" class="border-t border-slate-100 px-5 py-5 focus:outline-none">
+                                    <ul class="divide-y divide-slate-100">
                                         @foreach ($lineItems as $item)
-                                            <li class="flex items-start justify-between gap-4 py-4">
+                                            <li class="flex items-start justify-between gap-4 py-3 first:pt-0">
                                                 <div class="min-w-0">
                                                     <p class="font-semibold text-slate-900">{{ $item->name }}</p>
-                                                    @if ($item->domain_name)
-                                                        <p class="mt-0.5 truncate text-sm text-slate-500">{{ $item->domain_name }}</p>
-                                                    @endif
+                                                    @if ($item->domain_name)<p class="mt-0.5 truncate text-sm text-slate-500">{{ $item->domain_name }}</p>@endif
                                                     @if ($item->item_type === \App\Enums\ItemType::WebsitePackage)
                                                         <p class="mt-1 text-sm font-medium text-success">Includes a free domain &amp; hosting for the first year.</p>
                                                     @endif
@@ -105,21 +146,30 @@
                                             </li>
                                         @endforeach
                                     </ul>
-
-                                    <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="mt-4 flex items-center justify-between">
                                         <a href="{{ route('cart.index') }}" class="text-sm font-medium text-primary-600 hover:underline">Edit cart</a>
-                                        <button type="button" @click="next()" class="btn-primary sm:w-auto">Continue to billing</button>
+                                        <button type="button" @click="next()" class="btn-primary">Continue to billing</button>
                                     </div>
                                 </div>
+                            </div>
 
-                                {{-- Step: Billing --}}
-                                <div data-step="billing" x-show="isActive('billing')" x-cloak class="card">
-                                    <h2 data-step-heading class="text-xl font-bold focus:outline-none">Billing details</h2>
-                                    <p class="mt-1 text-sm text-slate-600">We use these details for your invoice and order confirmation.</p>
+                            {{-- Step 3: Billing address --}}
+                            <div class="rounded-[14px] border bg-white shadow-soft transition"
+                                 x-bind:class="isActive('billing') ? 'border-primary-500' : 'border-slate-200'">
+                                <button type="button" @click="goTo(1)" class="flex w-full items-center gap-3 px-5 py-4 text-left"
+                                        x-bind:class="isDone('billing') ? 'cursor-pointer' : 'cursor-default'">
+                                    <span class="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-sm font-bold"
+                                          x-bind:class="isActive('billing') ? 'bg-primary-500 text-white' : (isDone('billing') ? 'bg-success text-white' : 'bg-slate-100 text-slate-500')">
+                                        <span x-show="!isDone('billing')">3</span>
+                                        <svg x-show="isDone('billing')" x-cloak class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                                    </span>
+                                    <h2 data-step-heading class="flex-1 text-base font-bold focus:outline-none">Enter your billing address</h2>
+                                </button>
 
-                                    <div class="mt-4 alert alert-danger" role="alert" x-show="formError" x-text="formError" x-cloak></div>
+                                <div data-step="billing" x-show="isActive('billing')" x-cloak tabindex="-1" aria-label="Enter your billing address" class="border-t border-slate-100 px-5 py-5 focus:outline-none">
+                                    <div class="alert alert-danger mb-4" role="alert" x-show="formError" x-text="formError" x-cloak></div>
 
-                                    <form x-ref="billingForm" @submit.prevent="continueToPayment()" class="mt-5 space-y-4" novalidate>
+                                    <form x-ref="billingForm" @submit.prevent="continueToPayment()" class="space-y-4" novalidate>
                                         <x-checkout-field name="name" label="Full name" autocomplete="name" :required="true" :value="auth()->user()->name" />
                                         <div class="grid gap-4 sm:grid-cols-2">
                                             <x-checkout-field name="phone" label="Phone" type="tel" autocomplete="tel" :required="true" :value="auth()->user()->phone" />
@@ -136,9 +186,8 @@
                                             <x-checkout-field name="billing_country" label="Country code" autocomplete="country" :required="true" :value="auth()->user()->billing_country ?? 'GB'" help="2-letter code, e.g. GB" />
                                         </div>
 
-                                        <div class="flex items-start gap-3 border-t border-slate-200 pt-4">
-                                            <input type="checkbox" id="co_terms" name="terms" value="1" class="mt-1 h-5 w-5 rounded border-slate-300 text-primary-500 focus:ring-primary-500"
-                                                   x-bind:aria-invalid="fieldError('terms') ? 'true' : null" aria-describedby="co_terms_err">
+                                        <div class="flex items-start gap-3 border-t border-slate-100 pt-4">
+                                            <input type="checkbox" id="co_terms" name="terms" value="1" class="mt-1 h-5 w-5 rounded border-slate-300 text-primary-500 focus:ring-primary-500" aria-describedby="co_terms_err">
                                             <label for="co_terms" class="text-sm text-slate-600">
                                                 I agree to the <a href="{{ route('legal.terms') }}" class="font-medium text-primary-600 hover:underline">Terms of Use</a>,
                                                 <a href="{{ route('legal.refund') }}" class="font-medium text-primary-600 hover:underline">Refund Policy</a>, and understand that
@@ -147,9 +196,9 @@
                                         </div>
                                         <p id="co_terms_err" class="field-error" role="alert" x-show="fieldError('terms')" x-text="fieldError('terms')" x-cloak></p>
 
-                                        <div class="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
-                                            <button type="button" @click="back()" class="btn-secondary sm:w-auto">Back</button>
-                                            <button type="submit" class="btn-primary sm:w-auto" x-bind:disabled="initialising">
+                                        <div class="flex items-center justify-between pt-2">
+                                            <button type="button" @click="back()" class="btn-secondary">Back</button>
+                                            <button type="submit" class="btn-primary" x-bind:disabled="initialising">
                                                 <span x-show="!initialising">Continue to payment</span>
                                                 <span x-show="initialising" x-cloak class="inline-flex items-center gap-2">
                                                     <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4z"/></svg>
@@ -159,86 +208,45 @@
                                         </div>
                                     </form>
                                 </div>
+                            </div>
 
-                                {{-- Step: Payment --}}
-                                <div data-step="payment" x-show="isActive('payment')" x-cloak class="card">
-                                    <h2 data-step-heading class="text-xl font-bold focus:outline-none">Payment</h2>
-                                    <p class="mt-1 text-sm text-slate-600">
-                                        Paying for order <span class="font-semibold text-slate-700" x-text="orderNumber"></span>. Enter your card details below.
-                                    </p>
+                            {{-- Step 4: Payment method --}}
+                            <div class="rounded-[14px] border bg-white shadow-soft transition"
+                                 x-bind:class="isActive('payment') ? 'border-primary-500' : 'border-slate-200'">
+                                <div class="flex w-full items-center gap-3 px-5 py-4 text-left">
+                                    <span class="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-sm font-bold"
+                                          x-bind:class="isActive('payment') ? 'bg-primary-500 text-white' : 'bg-slate-100 text-slate-500'">4</span>
+                                    <h2 data-step-heading class="flex-1 text-base font-bold focus:outline-none">Choose a payment method</h2>
+                                </div>
 
-                                    <div class="mt-4 alert alert-danger" role="alert" x-show="formError" x-text="formError" x-cloak></div>
+                                <div data-step="payment" x-show="isActive('payment')" x-cloak tabindex="-1" aria-label="Choose a payment method" class="border-t border-slate-100 px-5 py-5 focus:outline-none">
+                                    <p class="text-sm text-slate-600">Paying for order <span class="font-semibold text-slate-700" x-text="orderNumber"></span>. Enter your card details below.</p>
+                                    <div class="alert alert-danger my-4" role="alert" x-show="formError" x-text="formError" x-cloak></div>
 
                                     {{-- Stripe Payment Element mounts here --}}
-                                    <div x-ref="paymentElement" class="mt-5 min-h-[44px]" aria-label="Card details"></div>
+                                    <div x-ref="paymentElement" class="mt-4 min-h-[44px]" aria-label="Card details"></div>
 
-                                    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                        <button type="button" @click="back()" class="btn-secondary sm:w-auto" x-bind:disabled="paying">Back</button>
-                                        <button type="button" @click="pay()" class="btn-primary sm:w-auto" x-bind:disabled="paying || !paymentReady">
-                                            <span x-show="!paying" class="inline-flex items-center gap-2">
-                                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                                                Pay £{{ number_format((float) $total, 2) }} now
-                                            </span>
-                                            <span x-show="paying" x-cloak class="inline-flex items-center gap-2">
-                                                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4z"/></svg>
-                                                Processing payment…
-                                            </span>
-                                        </button>
+                                    <div class="mt-5 flex items-center justify-between">
+                                        <button type="button" @click="back()" class="btn-secondary" x-bind:disabled="paying">Back</button>
+                                        <p class="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                            Secured by Stripe
+                                        </p>
                                     </div>
-
-                                    <p class="mt-4 inline-flex items-center gap-2 text-xs text-slate-500">
-                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                                        Payments are processed securely by Stripe. We never see or store your full card details.
-                                    </p>
                                 </div>
                             </div>
 
                             <noscript>
-                                <div class="alert alert-warning mt-4" role="alert">JavaScript is required to complete payment securely. Please enable JavaScript and reload this page.</div>
+                                <div class="alert alert-warning" role="alert">JavaScript is required to complete payment securely. Please enable JavaScript and reload this page.</div>
                             </noscript>
-                        @endif
-                    @endguest
-                </div>
-
-                {{-- ===================== RIGHT: live order summary ===================== --}}
-                <aside class="order-1 lg:order-2 lg:col-span-1" aria-label="Order summary">
-                    <div class="card lg:sticky lg:top-24">
-                        <h2 class="text-lg font-bold">Order summary</h2>
-
-                        <ul class="mt-4 divide-y divide-slate-200">
-                            @foreach ($lineItems as $item)
-                                <li class="flex items-start justify-between gap-3 py-3 text-sm">
-                                    <span class="min-w-0">
-                                        <span class="font-medium text-slate-900">{{ $item->name }}</span>
-                                        @if ($item->domain_name)
-                                            <span class="mt-0.5 block truncate text-slate-500">{{ $item->domain_name }}</span>
-                                        @endif
-                                        @if ($item->item_type === \App\Enums\ItemType::WebsitePackage)
-                                            <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">Free domain &amp; hosting · year 1</span>
-                                        @endif
-                                    </span>
-                                    <span class="whitespace-nowrap font-semibold text-slate-900">£{{ number_format((float) $item->total, 2) }}</span>
-                                </li>
-                            @endforeach
-                        </ul>
-
-                        <div class="mt-4 flex items-center justify-between border-t border-slate-200 pt-4 text-base font-bold text-slate-900">
-                            <span>Total due today</span>
-                            <span>£{{ number_format((float) $total, 2) }}</span>
                         </div>
 
-                        @if ($freeYearNotice)
-                            <p class="mt-3 rounded-[10px] bg-slate-50 p-3 text-xs text-slate-500">{{ $freeYearNotice }}</p>
-                        @endif
-
-                        <ul class="mt-4 space-y-2 text-xs text-slate-500">
-                            <li class="flex items-center gap-2"><svg class="h-4 w-4 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Secure on-site card payment</li>
-                            <li class="flex items-center gap-2"><svg class="h-4 w-4 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Automatic setup after payment</li>
-                            <li class="flex items-center gap-2"><svg class="h-4 w-4 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> UK support &amp; managed renewals</li>
-                        </ul>
+                        <aside class="lg:col-span-1" aria-label="Order summary">
+                            @include('checkout.partials.summary', ['showPay' => true, 'lineItems' => $lineItems, 'total' => $total, 'freeYearNotice' => $freeYearNotice])
+                        </aside>
                     </div>
-                </aside>
-            </div>
+                @endif
+            @endguest
         </div>
     </section>
 @endsection
