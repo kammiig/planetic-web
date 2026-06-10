@@ -18,22 +18,37 @@
                     <tr>
                         <th scope="col">Domain</th>
                         <th scope="col">Status</th>
+                        <th scope="col">Order</th>
+                        <th scope="col">Registered</th>
                         <th scope="col">Expiry</th>
-                        <th scope="col">DNS</th>
+                        <th scope="col">Price</th>
                         <th scope="col"><span class="sr-only">Actions</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($domains as $domain)
+                        @php
+                            $item = $domain->order?->items->firstWhere('domain_name', $domain->domain_name);
+                            $isWebsiteBundle = $item && $item->item_type === \App\Enums\ItemType::WebsitePackage;
+                        @endphp
                         <tr>
                             <td class="font-semibold text-slate-900">{{ $domain->domain_name }}</td>
-                            <td><x-status-badge :status="$domain->status" /></td>
+                            <td>
+                                <x-status-badge :status="$domain->status" />
+                                @if (in_array($domain->status, [\App\Enums\DomainStatus::Failed, \App\Enums\DomainStatus::ManualReview, \App\Enums\DomainStatus::RegistrationPending], true))
+                                    <p class="mt-1 text-xs text-slate-500">{{ $domain->status->customerLabel() }}</p>
+                                @endif
+                            </td>
+                            <td>{{ $domain->order?->order_number ?? '—' }}</td>
+                            <td>{{ $domain->registration_date?->format('j M Y') ?? '—' }}</td>
                             <td>{{ $domain->expiry_date?->format('j M Y') ?? '—' }}</td>
                             <td>
-                                @if ($domain->cloudflare_zone_id)
-                                    <span class="badge badge-success"><span class="badge-dot"></span> Cloudflare</span>
+                                @if ($isWebsiteBundle)
+                                    Included
+                                @elseif ($item)
+                                    £{{ number_format((float) $item->unit_price, 2) }}
                                 @else
-                                    <span class="badge badge-warning"><span class="badge-dot"></span> Pending</span>
+                                    —
                                 @endif
                             </td>
                             <td class="text-right">

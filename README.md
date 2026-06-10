@@ -136,11 +136,17 @@ compiled `public/build` directory.
 * * * * * cd /home/cpanelusername/planeticweb-app && /usr/local/bin/php artisan schedule:run >> /dev/null 2>&1
 ```
 
-**Queue worker** (processes provisioning, billing and email jobs — cron-based, no Supervisor needed):
+**Queue worker** (safety net for any queued jobs — cron-based, no Supervisor needed):
 
 ```bash
 * * * * * cd /home/cpanelusername/planeticweb-app && /usr/local/bin/php artisan queue:work --stop-when-empty --tries=3 --timeout=120 >> /dev/null 2>&1
 ```
+
+> **Provisioning runs synchronously by default** (`PROVISIONING_SYNC=true`), so a customer's
+> services are created the instant the verified Stripe webhook arrives — **no queue worker is
+> required** for provisioning. Keep the queue cron above for other background jobs, and the
+> scheduler cron (which also runs `orders:provision --stuck` every 10 min to finish any order
+> whose provisioning stalled). Set `PROVISIONING_SYNC=false` only if you run a dedicated worker.
 
 ### 5. Stripe webhook
 
@@ -159,6 +165,38 @@ Subscribe to: `checkout.session.completed`, `payment_intent.succeeded`,
 The public hosting plans map to WHM packages in the `hosting_packages` table (seeded as
 `planetic_starter`, `planetic_business`, `planetic_pro`, `planetic_agency`). Create matching packages in
 WHM, or edit the mapping in the admin panel (Super Admin).
+
+### 7. Provisioning & troubleshooting
+
+If an order is stuck (payment taken but services not showing), use the built-in commands:
+
+```bash
+# Inspect an order: payment status, Stripe IDs, each provisioning step, service records, last error.
+php artisan orders:debug ORD-10007
+
+# Re-run provisioning for one order. Confirms the charge with Stripe, creates any missing
+# service records, and completes only the outstanding steps (idempotent — never duplicates).
+php artisan orders:provision ORD-10007
+
+# If Stripe cannot confirm the charge automatically (e.g. the webhook never arrived AND the
+# PaymentIntent id was lost), verify the payment in the Stripe dashboard first, then force it:
+php artisan orders:provision ORD-10007 --mark-paid
+
+# Batch self-heal every paid-but-incomplete order (also runs automatically every 10 min via cron).
+php artisan orders:provision --stuck
+```
+
+Common causes of a stuck order and the fix:
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Order stays "pending", tabs empty | Stripe webhook not configured / wrong `STRIPE_WEBHOOK_SECRET` | Add the endpoint (step 5), set the secret, then `orders:provision ORD-xxxx` for past orders |
+| Order "provisioning" but a service missing | A provisioning step failed (registrar/WHM/Cloudflare error or missing API key) | `orders:debug ORD-xxxx` to see the error; fix config; `orders:provision ORD-xxxx` to retry |
+| Want to test the full flow without registrar/WHM/Cloudflare keys | — | Set `PROVISIONING_DRY_RUN=true` to simulate provisioning with Stripe test keys only |
+
+All provisioning activity is logged to `storage/logs` (Stripe webhook received, payment confirmed,
+domain/Cloudflare/WHM summaries, failures, duplicates skipped, order completed) — **never** API
+tokens, passwords or card details.
 
 ### Redeploying
 

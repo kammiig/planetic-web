@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Entry point of the provisioning pipeline. Builds the idempotent
@@ -34,7 +35,14 @@ class ProvisionOrderJob implements ShouldQueue
             return;
         }
 
-        foreach ($this->stepsFor($order) as $jobType) {
+        $steps = $this->stepsFor($order);
+
+        Log::channel('stack')->info('Provisioning started.', [
+            'order' => $order->order_number,
+            'steps' => array_map(fn ($s) => $s->value, $steps),
+        ]);
+
+        foreach ($steps as $jobType) {
             $order->provisioningJobs()->firstOrCreate(
                 ['job_type' => $jobType->value],
                 [
@@ -60,10 +68,19 @@ class ProvisionOrderJob implements ShouldQueue
             fn ($i) => in_array($i->item_type, [ItemType::WebsitePackage, ItemType::Hosting], true)
         );
 
+        // We only manage a Cloudflare zone / DNS when the order also includes
+        // hosting (a bundle or the website package) — there is a server to point
+        // the records at. A domain-only registration is just registered, so it
+        // never gets stuck waiting on DNS that has nowhere to resolve.
+        $manageDns = $needsDomain && $needsHosting;
+
         $steps = [];
 
         if ($needsDomain) {
             $steps[] = ProvisioningJobType::RegisterDomain;
+        }
+
+        if ($manageDns) {
             $steps[] = ProvisioningJobType::CreateCloudflareZone;
             $steps[] = ProvisioningJobType::UpdateNameservers;
         }
@@ -73,7 +90,7 @@ class ProvisionOrderJob implements ShouldQueue
         }
 
         // DNS records are only created when we manage the Cloudflare zone.
-        if ($needsDomain) {
+        if ($manageDns) {
             $steps[] = ProvisioningJobType::CreateDnsRecords;
         }
 

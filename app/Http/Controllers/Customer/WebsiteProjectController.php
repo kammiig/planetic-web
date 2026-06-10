@@ -18,7 +18,7 @@ class WebsiteProjectController extends Controller
     public function index(Request $request): View
     {
         return view('customer.projects.index', [
-            'projects' => $request->user()->websiteProjects()->latest()->get(),
+            'projects' => $request->user()->websiteProjects()->with(['order', 'domain'])->latest()->get(),
         ]);
     }
 

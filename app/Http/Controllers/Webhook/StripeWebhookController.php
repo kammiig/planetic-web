@@ -10,9 +10,9 @@ use App\Jobs\Renewals\UnsuspendPaidHostingJob;
 use App\Models\Order;
 use App\Models\StripeEvent;
 use App\Models\Subscription;
+use App\Services\Billing\StripeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use App\Services\Billing\StripeService;
 use Stripe\Event;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
@@ -45,9 +45,19 @@ class StripeWebhookController extends Controller
             return response('Invalid signature', Response::HTTP_BAD_REQUEST);
         }
 
+        Log::channel('stack')->info('Stripe webhook received.', [
+            'event' => $event->id,
+            'type' => $event->type,
+        ]);
+
         // 2. Idempotency — ignore events we've already processed.
         $record = StripeEvent::firstOrNew(['stripe_event_id' => $event->id]);
         if ($record->exists && $record->status === 'processed') {
+            Log::channel('stack')->info('Stripe webhook duplicate skipped.', [
+                'event' => $event->id,
+                'type' => $event->type,
+            ]);
+
             return response('Already processed', Response::HTTP_OK);
         }
 

@@ -63,6 +63,25 @@ class CreateCloudflareDnsRecordsJob extends ProvisioningStepJob
                 $payload['priority'] = $record['priority'];
             }
 
+            // Safe test mode: persist the record locally without calling Cloudflare.
+            if (config('provisioning.dry_run', false)) {
+                $domain->dnsRecords()->create([
+                    'user_id' => $order->user_id,
+                    'cloudflare_zone_id' => $zone->id,
+                    'cloudflare_record_id' => 'dry-run-'.$record['type'].'-'.$created,
+                    'type' => $record['type'],
+                    'name' => $record['name'],
+                    'content' => $record['content'],
+                    'ttl' => $record['ttl'],
+                    'proxied' => $record['proxied'],
+                    'priority' => $record['priority'] ?? null,
+                    'status' => 'active',
+                ]);
+                $created++;
+
+                continue;
+            }
+
             try {
                 $cfRecord = $cloudflare->createDnsRecord($zone->zone_id, $payload);
             } catch (CloudflareException $e) {

@@ -12,7 +12,7 @@ class HostingController extends Controller
     public function index(Request $request): View
     {
         return view('customer.hosting.index', [
-            'accounts' => $request->user()->hostingAccounts()->with('hostingPackage')->latest()->paginate(15),
+            'accounts' => $request->user()->hostingAccounts()->with(['hostingPackage', 'order'])->latest()->paginate(15),
         ]);
     }
 

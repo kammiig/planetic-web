@@ -33,6 +33,13 @@ class UpdateRegistrarNameserversJob extends ProvisioningStepJob
             throw new ProvisioningException('Cloudflare has not yet assigned nameservers for this domain.');
         }
 
+        // Safe test mode: record the nameservers without calling the registrar.
+        if (config('provisioning.dry_run', false)) {
+            $domain->update(['nameservers' => $nameservers, 'last_synced_at' => now()]);
+
+            return ['simulated' => true, 'nameservers' => $nameservers];
+        }
+
         $registrar = app(RegistrarInterface::class);
         $result = $registrar->updateNameservers($domain->domain_name, $nameservers);
 

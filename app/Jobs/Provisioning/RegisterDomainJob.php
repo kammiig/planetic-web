@@ -4,14 +4,15 @@ namespace App\Jobs\Provisioning;
 
 use App\Enums\DomainStatus;
 use App\Enums\ProvisioningJobType;
-use App\Exceptions\RegistrarException;
 use App\Exceptions\ProvisioningException;
+use App\Exceptions\RegistrarException;
 use App\Models\Domain;
 use App\Models\Order;
 use App\Models\ProvisioningJob;
 use App\Services\Registrar\RegistrarInterface;
 use App\Support\DomainName;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -58,6 +59,19 @@ class RegisterDomainJob extends ProvisioningStepJob
 
         $this->ensureRegistrantContact($domain, $order);
 
+        // Safe test mode: mark the domain active without calling the registrar.
+        if (config('provisioning.dry_run', false)) {
+            $domain->update([
+                'status' => DomainStatus::Active->value,
+                'registrar_domain_id' => 'dry-run-'.$domain->id,
+                'registration_date' => now()->toDateString(),
+                'expiry_date' => now()->addYear()->toDateString(),
+                'last_synced_at' => now(),
+            ]);
+
+            return ['simulated' => true, 'domain' => $domainName];
+        }
+
         $registrar = app(RegistrarInterface::class);
 
         try {
@@ -84,6 +98,14 @@ class RegisterDomainJob extends ProvisioningStepJob
             'registration_date' => now()->toDateString(),
             'expiry_date' => $expiry->toDateString(),
             'last_synced_at' => now(),
+        ]);
+
+        Log::channel('stack')->info('Domain registered.', [
+            'order' => $order->order_number,
+            'domain' => $domainName,
+            'registrar' => $registrar->name(),
+            'registrar_order_id' => $result['registrar_order_id'] ?? null,
+            'expiry_date' => $expiry->toDateString(),
         ]);
 
         return $result;

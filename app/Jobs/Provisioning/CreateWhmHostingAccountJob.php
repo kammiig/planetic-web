@@ -6,17 +6,22 @@ use App\Enums\HostingStatus;
 use App\Enums\ItemType;
 use App\Enums\ProvisioningJobType;
 use App\Exceptions\ProvisioningException;
+use App\Exceptions\WhmException;
 use App\Models\HostingAccount;
 use App\Models\HostingPackage;
 use App\Models\Order;
 use App\Models\ProvisioningJob;
 use App\Services\Hosting\CpanelPackageMapper;
 use App\Services\Hosting\WhmService;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Creates the cPanel account via WHM (Ticket 31). Idempotent on the order:
- * a duplicate account is never created. Domain-already-exists collisions are
- * routed to manual review by WhmService.
+ * a duplicate account is never created. It adopts the pending hosting record
+ * created at payment time (so the dashboard already shows the account) and
+ * flips it to Active on success. If WHM fails, the record is kept and marked
+ * Failed / Manual review — the customer's hosting never silently disappears.
+ * Domain-already-exists collisions are routed to manual review by WhmService.
  */
 class CreateWhmHostingAccountJob extends ProvisioningStepJob
 {
@@ -27,39 +32,77 @@ class CreateWhmHostingAccountJob extends ProvisioningStepJob
 
     protected function perform(Order $order, ProvisioningJob $step): array
     {
-        // Idempotency — one hosting account per order.
-        if ($order->hostingAccount()->exists()) {
+        $account = $order->hostingAccount()->first();
+
+        // Idempotency — the account has already been created on WHM.
+        if ($account && $account->created_on_whm_at && $account->status === HostingStatus::Active) {
             return ['skipped' => true, 'reason' => 'account_exists'];
         }
 
-        $domain = $order->domain()->first();
-        $domainName = $domain?->domain_name ?? $this->existingDomainName($order);
+        $domainName = $account?->domain_name
+            ?? $order->domain()->value('domain_name')
+            ?? $this->existingDomainName($order);
 
         if (blank($domainName)) {
             throw new ProvisioningException('Hosting requires a domain name.');
         }
 
-        $package = $this->resolvePackage($order);
-        $mapper = app(CpanelPackageMapper::class);
+        $package = $account?->hostingPackage ?? $this->resolvePackage($order);
 
-        $username = $mapper->generateUsername($domainName);
-        $password = $mapper->generatePassword();
+        if (! $package) {
+            throw new ProvisioningException('No hosting package is configured for this order.', manualReview: true);
+        }
+
+        $mapper = app(CpanelPackageMapper::class);
+        // Reuse the username generated for the pending record so the customer
+        // sees a stable username from the moment of purchase.
+        $username = $account?->whm_username ?: $mapper->generateUsername($domainName);
         $plan = $mapper->whmPackageFor($package);
 
-        $result = app(WhmService::class)->createAccount([
-            'username' => $username,
-            'domain' => $domainName,
-            'contactemail' => $order->user->email,
-            'plan' => $plan,
-            'password' => $password,
-        ]);
+        // Safe test mode: simulate a created account without touching WHM.
+        if (config('provisioning.dry_run', false)) {
+            $this->persistActiveAccount($order, $account, $domainName, $username, $package, config('whm.server_ip') ?: '127.0.0.1');
+
+            return ['simulated' => true, 'username' => $username, 'package' => $plan];
+        }
+
+        try {
+            $result = app(WhmService::class)->createAccount([
+                'username' => $username,
+                'domain' => $domainName,
+                'contactemail' => $order->user->email,
+                'plan' => $plan,
+                'password' => $mapper->generatePassword(),
+            ]);
+        } catch (WhmException $e) {
+            // Payment succeeded but account creation failed → keep a visible
+            // record marked failed/manual review, then propagate so the step
+            // is recorded as failed and the order goes to manual review.
+            $this->markFailedAccount($order, $account, $domainName, $username, $package, $e->manualReview);
+
+            throw $e;
+        }
 
         $serverIp = $result['ip'] ?: config('whm.server_ip');
 
-        HostingAccount::create([
-            'user_id' => $order->user_id,
-            'order_id' => $order->id,
-            'domain_id' => $domain?->id,
+        Log::channel('stack')->info('WHM account created.', [
+            'order' => $order->order_number,
+            'username' => $username,
+            'package' => $plan,
+        ]);
+
+        $this->persistActiveAccount($order, $account, $domainName, $username, $package, $serverIp);
+
+        // Note: the generated cPanel password is intentionally not stored in
+        // plain text. Customers access cPanel via the dashboard link / reset.
+        return ['username' => $username, 'ip' => $serverIp, 'package' => $plan];
+    }
+
+    /** Create or adopt the hosting record and mark it Active. */
+    private function persistActiveAccount(Order $order, ?HostingAccount $account, string $domainName, string $username, ?HostingPackage $package, ?string $serverIp): void
+    {
+        $attributes = [
+            'domain_id' => $order->domain()->value('id'),
             'hosting_package_id' => $package?->id,
             'domain_name' => $domainName,
             'whm_username' => $username,
@@ -70,13 +113,46 @@ class CreateWhmHostingAccountJob extends ProvisioningStepJob
             'disk_limit_mb' => $package?->disk_limit_mb,
             'bandwidth_limit_mb' => $package?->bandwidth_limit_mb,
             'created_on_whm_at' => now(),
-            'renewal_date' => now()->addYear()->toDateString(),
+            'renewal_date' => $account?->renewal_date?->toDateString() ?? now()->addYear()->toDateString(),
             'last_synced_at' => now(),
-        ]);
+        ];
 
-        // Note: the generated cPanel password is intentionally not stored in
-        // plain text. Customers access cPanel via the dashboard link / reset.
-        return ['username' => $username, 'ip' => $serverIp, 'package' => $plan];
+        if ($account) {
+            $account->update($attributes);
+
+            return;
+        }
+
+        HostingAccount::create(array_merge($attributes, [
+            'user_id' => $order->user_id,
+            'order_id' => $order->id,
+        ]));
+    }
+
+    /** Ensure a visible hosting record exists, marked failed / manual review. */
+    private function markFailedAccount(Order $order, ?HostingAccount $account, string $domainName, string $username, ?HostingPackage $package, bool $manualReview): void
+    {
+        $status = $manualReview ? HostingStatus::ManualReview->value : HostingStatus::Failed->value;
+
+        if ($account) {
+            $account->update(['status' => $status]);
+
+            return;
+        }
+
+        HostingAccount::create([
+            'user_id' => $order->user_id,
+            'order_id' => $order->id,
+            'domain_id' => $order->domain()->value('id'),
+            'hosting_package_id' => $package?->id,
+            'domain_name' => $domainName,
+            'whm_username' => $username,
+            'server_hostname' => config('whm.server_hostname'),
+            'status' => $status,
+            'disk_limit_mb' => $package?->disk_limit_mb,
+            'bandwidth_limit_mb' => $package?->bandwidth_limit_mb,
+            'renewal_date' => now()->addYear()->toDateString(),
+        ]);
     }
 
     private function existingDomainName(Order $order): ?string

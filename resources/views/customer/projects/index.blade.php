@@ -21,6 +21,12 @@
                         </div>
                         <x-status-badge :status="$project->status" />
                     </div>
+                    <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
+                        <div><dt class="text-slate-500">Order</dt><dd class="font-medium">{{ $project->order?->order_number ?? '—' }}</dd></div>
+                        <div><dt class="text-slate-500">Price paid</dt><dd class="font-medium">{{ $project->order ? '£'.number_format((float) $project->order->total, 2) : '—' }}</dd></div>
+                        <div><dt class="text-slate-500">Ordered</dt><dd class="font-medium">{{ $project->order?->paid_at?->format('j M Y') ?? $project->created_at?->format('j M Y') ?? '—' }}</dd></div>
+                        <div><dt class="text-slate-500">Domain</dt><dd class="font-medium">{{ $project->domain?->domain_name ?? '—' }}</dd></div>
+                    </dl>
                     @if ($action = $project->status->customerNextAction())
                         <p class="mt-3 text-sm text-warning">{{ $action }}</p>
                     @endif

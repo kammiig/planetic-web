@@ -2,17 +2,19 @@
 
 namespace App\Actions\Checkout;
 
+use App\Actions\Provisioning\EnsureServiceRecords;
 use App\Enums\ItemType;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\SubscriptionStatus;
-use App\Enums\WebsiteProjectStatus;
 use App\Jobs\Provisioning\ProvisionOrderJob;
 use App\Mail\OrderConfirmationMail;
 use App\Models\Order;
 use App\Services\Billing\InvoiceService;
 use App\Services\Notifications\NotificationService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Runs once a Stripe webhook has confirmed payment. This is the ONLY place an
@@ -48,9 +50,26 @@ class CompletePaidOrder
                 $this->invoices->recordSuccessfulPayment($order, $context['payment_intent'], $context['customer'] ?? null);
             }
 
-            $this->createWebsiteProject($order->fresh('items'));
             $this->createSubscriptions($order->fresh('items'));
         });
+
+        Log::channel('stack')->info('Payment success detected — order marked paid.', [
+            'order' => $order->order_number,
+            'payment_intent' => $context['payment_intent'] ?? $order->stripe_payment_intent_id,
+        ]);
+
+        // Create the customer-visible service records immediately so the
+        // dashboard tabs are never empty after payment — even before (or if)
+        // the external provisioning APIs run. Best-effort: a hiccup here must
+        // never undo the recorded payment above.
+        try {
+            app(EnsureServiceRecords::class)->handle($order->fresh('items'));
+        } catch (Throwable $e) {
+            Log::channel('stack')->error('Could not create pending service records.', [
+                'order' => $order->order_number,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         // Order confirmation email (failures are logged, never block the flow).
         app(NotificationService::class)->send(
@@ -59,24 +78,33 @@ class CompletePaidOrder
             'order_confirmation',
         );
 
-        // Hand off to the queued provisioning pipeline.
-        ProvisionOrderJob::dispatch($order->id);
+        // Run provisioning. Synchronous by default (no queue worker required on
+        // cPanel); a failure inside a step is captured per-step and must not
+        // bubble up to fail the webhook.
+        try {
+            $this->dispatchProvisioning($order);
+        } catch (Throwable $e) {
+            Log::channel('stack')->error('Provisioning dispatch failed.', [
+                'order' => $order->order_number,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
-    private function createWebsiteProject(Order $order): void
+    /**
+     * Kick off the provisioning pipeline. Runs inline when provisioning.sync is
+     * enabled (default) so services appear immediately without a background
+     * worker; otherwise pushes onto the queue for a worker/cron to process.
+     */
+    private function dispatchProvisioning(Order $order): void
     {
-        if (! $order->containsWebsitePackage() || $order->websiteProject()->exists()) {
+        if (config('provisioning.sync', true)) {
+            ProvisionOrderJob::dispatchSync($order->id);
+
             return;
         }
 
-        $project = $order->websiteProject()->create([
-            'user_id' => $order->user_id,
-            'project_number' => 'TMP-'.uniqid(),
-            'status' => WebsiteProjectStatus::InformationRequired->value,
-            'business_name' => $order->user->company_name,
-        ]);
-
-        $project->update(['project_number' => 'PRJ-'.(10000 + $project->id)]);
+        ProvisionOrderJob::dispatch($order->id);
     }
 
     private function createSubscriptions(Order $order): void

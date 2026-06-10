@@ -9,6 +9,7 @@ use App\Models\CloudflareZone;
 use App\Models\Order;
 use App\Models\ProvisioningJob;
 use App\Services\DNS\CloudflareService;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Creates the Cloudflare zone for the order's domain (Ticket 28). Idempotent:
@@ -31,6 +32,28 @@ class CreateCloudflareZoneJob extends ProvisioningStepJob
 
         if (filled($domain->cloudflare_zone_id)) {
             return ['skipped' => true, 'reason' => 'zone_exists'];
+        }
+
+        // Safe test mode: simulate a zone without calling Cloudflare.
+        if (config('provisioning.dry_run', false)) {
+            $record = CloudflareZone::updateOrCreate(
+                ['zone_id' => 'dry-run-zone-'.$domain->id],
+                [
+                    'user_id' => $order->user_id,
+                    'domain_id' => $domain->id,
+                    'zone_name' => $domain->domain_name,
+                    'status' => 'active',
+                    'name_servers' => ['ns1.dry-run.cloudflare.com', 'ns2.dry-run.cloudflare.com'],
+                    'ssl_mode' => config('cloudflare.default_ssl_mode', 'full'),
+                    'always_use_https' => config('cloudflare.always_use_https', true),
+                    'created_on_cloudflare_at' => now(),
+                    'last_synced_at' => now(),
+                ],
+            );
+
+            $domain->update(['cloudflare_zone_id' => $record->id, 'nameservers' => $record->name_servers]);
+
+            return ['simulated' => true, 'zone_id' => $record->zone_id];
         }
 
         $cloudflare = app(CloudflareService::class);
@@ -78,6 +101,12 @@ class CreateCloudflareZoneJob extends ProvisioningStepJob
         } catch (CloudflareException) {
             // Non-critical; the zone is created.
         }
+
+        Log::channel('stack')->info('Cloudflare zone created.', [
+            'order' => $order->order_number,
+            'domain' => $domain->domain_name,
+            'zone_id' => $zone['id'],
+        ]);
 
         return ['zone_id' => $zone['id'], 'name_servers' => $zone['name_servers']];
     }

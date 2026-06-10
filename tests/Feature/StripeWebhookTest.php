@@ -25,6 +25,10 @@ class StripeWebhookTest extends TestCase
         $this->seed([RoleSeeder::class, ProductSeeder::class]);
         config()->set('stripe.webhook_secret', $this->secret);
         config()->set('stripe.secret_key', 'sk_test_dummy');
+        // Exercise the queued provisioning path here so we can assert the job is
+        // enqueued. The synchronous path (the production default) is covered in
+        // ProvisioningTest / ProvisioningRecoveryTest.
+        config()->set('provisioning.sync', false);
     }
 
     private function pendingOrder(): Order

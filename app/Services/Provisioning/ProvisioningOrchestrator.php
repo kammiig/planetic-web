@@ -12,6 +12,7 @@ use App\Jobs\Provisioning\RegisterDomainJob;
 use App\Jobs\Provisioning\SendProvisioningCompletedEmailJob;
 use App\Jobs\Provisioning\UpdateRegistrarNameserversJob;
 use App\Models\Order;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Drives the provisioning step chain. Each step job calls advance() on
@@ -75,7 +76,13 @@ class ProvisioningOrchestrator
         }
 
         // Every required step completed → order is done.
-        $order->forceFill(['status' => OrderStatus::Completed->value])->save();
+        if ($order->status !== OrderStatus::Completed) {
+            $order->forceFill(['status' => OrderStatus::Completed->value])->save();
+            Log::channel('stack')->info('Provisioning completed — all steps done.', [
+                'order_id' => $order->id,
+                'order' => $order->order_number,
+            ]);
+        }
     }
 
     public function jobClassFor(ProvisioningJobType $type): string
@@ -83,9 +90,24 @@ class ProvisioningOrchestrator
         return self::JOBS[$type->value];
     }
 
+    /**
+     * Dispatch a provisioning job. Runs inline when provisioning.sync is on
+     * (default) so the whole chain completes without a queue worker; otherwise
+     * pushes onto the queue.
+     */
+    public function dispatchJob(string $jobClass, int $orderId): void
+    {
+        if (config('provisioning.sync', true)) {
+            $jobClass::dispatchSync($orderId);
+
+            return;
+        }
+
+        $jobClass::dispatch($orderId);
+    }
+
     private function dispatchStep(string $type, Order $order): void
     {
-        $jobClass = self::JOBS[$type];
-        $jobClass::dispatch($order->id);
+        $this->dispatchJob(self::JOBS[$type], $order->id);
     }
 }

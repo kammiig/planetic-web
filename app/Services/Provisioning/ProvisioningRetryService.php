@@ -36,7 +36,7 @@ class ProvisioningRetryService
         ])->save();
 
         $jobClass = $this->orchestrator->jobClassFor($job->job_type);
-        $jobClass::dispatch($job->order_id);
+        $this->orchestrator->dispatchJob($jobClass, $job->order_id);
 
         return true;
     }
