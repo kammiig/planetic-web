@@ -18,3 +18,8 @@ deployment:
     - /usr/local/bin/php artisan route:cache
     - /usr/local/bin/php artisan view:cache
     - /usr/local/bin/php artisan event:cache
+    # The live document root (~/public_html) is a separate copy of public/ and
+    # the host does not follow symlinks for static files, so the built assets
+    # must be copied there on every deploy. index.php/.htaccess in public_html
+    # are deliberately NOT touched (they were adjusted to bootstrap this app).
+    - /bin/bash -c '[ -d "$HOME/public_html" ] && [ ! -L "$HOME/public_html/build" ] && /usr/bin/rsync -a --delete ./public/build/ "$HOME/public_html/build/" || true'
