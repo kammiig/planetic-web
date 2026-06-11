@@ -27,10 +27,11 @@ class OrdersDebugCommand extends Command
             return self::FAILURE;
         }
 
-        $order->load(['items', 'provisioningJobs', 'domain', 'hostingAccount', 'websiteProject', 'invoice', 'payments']);
+        $order->load(['items', 'provisioningJobs', 'domain.cloudflareZone', 'hostingAccount', 'websiteProject', 'invoice', 'payments', 'user']);
 
         $this->components->info("Order {$order->order_number}");
         $this->table(['Field', 'Value'], [
+            ['Customer', $order->user ? "{$order->user->name} <{$order->user->email}>" : '—'],
             ['Order status', $order->status->value],
             ['Payment status', $order->payment_status->value],
             ['Paid at', (string) ($order->paid_at ?? '—')],
@@ -62,8 +63,10 @@ class OrdersDebugCommand extends Command
         // Service records.
         $this->line('');
         $this->components->info('Service records');
+        $zone = $order->domain?->cloudflareZone;
         $this->table(['Service', 'Present', 'Status', 'Detail'], [
             ['Domain', $order->domain ? 'yes' : 'no', $order->domain?->status->value ?? '—', $order->domain?->domain_name ?? '—'],
+            ['Cloudflare zone', $zone ? 'yes' : 'no', $zone?->status?->value ?? '—', $zone?->zone_id ?? '—'],
             ['Hosting', $order->hostingAccount ? 'yes' : 'no', $order->hostingAccount?->status->value ?? '—', $order->hostingAccount?->whm_username ?? '—'],
             ['Website project', $order->websiteProject ? 'yes' : 'no', $order->websiteProject?->status->value ?? '—', $order->websiteProject?->project_number ?? '—'],
         ]);

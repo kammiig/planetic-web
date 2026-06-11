@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Checkout\ConfirmOrderPayment;
 use App\Actions\Orders\CreateOrderFromCart;
 use App\Enums\OrderStatus;
 use App\Http\Requests\CheckoutRequest;
@@ -85,14 +86,33 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Confirmation page. NEVER provisions — provisioning happens only after the
-     * verified webhook. This page simply reflects the order's backend status.
+     * Confirmation page. The browser's redirect is never trusted: when the
+     * order is still unpaid we ask Stripe directly (server-to-server) whether
+     * the charge succeeded, and only then complete the order. Idempotent with
+     * the webhook and the scheduled sweep — whichever runs first wins, the
+     * rest are no-ops. This means services are provisioned even if the Stripe
+     * webhook endpoint is missing or misconfigured.
      */
-    public function success(Request $request): View
+    public function success(Request $request, ConfirmOrderPayment $confirm): View
     {
         $order = $this->locateOrderForConfirmation($request);
 
         if ($order) {
+            if (! $order->isPaid()) {
+                try {
+                    $confirm->handle($order);
+                } catch (Throwable $e) {
+                    // Never break the confirmation page — the scheduled sweep
+                    // (orders:provision --stuck) will finish the job.
+                    Log::channel('stack')->error('Success-page payment confirmation failed.', [
+                        'order' => $order->order_number,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            $order->refresh();
+
             // Start a fresh checkout next time — this order is now with Stripe.
             $request->session()->forget('checkout_order_id');
         }

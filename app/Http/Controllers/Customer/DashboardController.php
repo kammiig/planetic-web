@@ -21,12 +21,30 @@ class DashboardController extends Controller
             $user->subscriptions()->whereNotNull('next_renewal_date')->min('next_renewal_date'),
         ])->filter()->sort()->first();
 
+        // Paid-but-not-yet-active services count too — a customer who just paid
+        // must never stare at a wall of zeros while provisioning runs.
+        $pendingDomainStatuses = [
+            DomainStatus::Pending->value,
+            DomainStatus::RegistrationPending->value,
+            DomainStatus::Failed->value,
+            DomainStatus::ManualReview->value,
+        ];
+        $pendingHostingStatuses = [
+            HostingStatus::Pending->value,
+            HostingStatus::Creating->value,
+            HostingStatus::Failed->value,
+            HostingStatus::ManualReview->value,
+        ];
+
         return view('customer.dashboard', [
             'domainsCount' => $user->domains()->where('status', DomainStatus::Active->value)->count(),
+            'pendingDomainsCount' => $user->domains()->whereIn('status', $pendingDomainStatuses)->count(),
             'hostingCount' => $user->hostingAccounts()->where('status', HostingStatus::Active->value)->count(),
+            'pendingHostingCount' => $user->hostingAccounts()->whereIn('status', $pendingHostingStatuses)->count(),
             'openInvoicesCount' => $user->invoices()->whereIn('status', [InvoiceStatus::Open->value, InvoiceStatus::Failed->value])->count(),
             'nextRenewal' => $nextRenewal,
             'project' => $user->websiteProjects()->latest()->first(),
+            'projectsCount' => $user->websiteProjects()->count(),
             'openTicketsCount' => $user->supportTickets()->whereNotIn('status', ['resolved', 'closed'])->count(),
             'recentOrders' => $user->orders()->latest()->take(3)->get(),
             'inProgressOrders' => $user->orders()->whereIn('status', ['provisioning', 'manual_review', 'pending'])->latest()->get(),

@@ -11,6 +11,7 @@ use App\Jobs\Provisioning\ProvisionOrderJob;
 use App\Mail\OrderConfirmationMail;
 use App\Models\Order;
 use App\Services\Billing\InvoiceService;
+use App\Services\Notifications\AdminNotifier;
 use App\Services\Notifications\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -35,7 +36,15 @@ class CompletePaidOrder
             return;
         }
 
-        DB::transaction(function () use ($order, $context) {
+        // The webhook, the success page and the scheduled sweep may all detect
+        // the same payment at once; the row lock makes exactly one of them win.
+        $proceed = DB::transaction(function () use ($order, $context) {
+            $current = Order::whereKey($order->id)->lockForUpdate()->first();
+
+            if (! $current || $current->isPaid()) {
+                return false;
+            }
+
             $order->forceFill([
                 'status' => OrderStatus::Provisioning->value,
                 'payment_status' => PaymentStatus::Succeeded->value,
@@ -51,7 +60,13 @@ class CompletePaidOrder
             }
 
             $this->createSubscriptions($order->fresh('items'));
+
+            return true;
         });
+
+        if (! $proceed) {
+            return;
+        }
 
         Log::channel('stack')->info('Payment success detected — order marked paid.', [
             'order' => $order->order_number,
@@ -77,6 +92,22 @@ class CompletePaidOrder
             new OrderConfirmationMail($order->fresh('items')),
             'order_confirmation',
         );
+
+        // A bespoke website sale needs a human kick-off — tell the admin team.
+        if ($order->containsWebsitePackage()) {
+            app(AdminNotifier::class)->alert(
+                'New website project purchased',
+                'A customer has bought the £200 bespoke website package. The project record is in the admin panel awaiting kick-off.',
+                array_filter([
+                    'Order' => $order->order_number,
+                    'Customer' => $order->user?->name.' <'.$order->user?->email.'>',
+                    'Domain' => $order->primaryDomainName(),
+                    'Total' => '£'.number_format((float) $order->total, 2),
+                ]),
+                url('/admin/website-projects'),
+                'Open website projects',
+            );
+        }
 
         // Run provisioning. Synchronous by default (no queue worker required on
         // cPanel); a failure inside a step is captured per-step and must not

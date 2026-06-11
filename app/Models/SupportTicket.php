@@ -42,4 +42,9 @@ class SupportTicket extends Model
     {
         return $this->messages()->where('is_internal_note', false);
     }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(SupportTicketAttachment::class);
+    }
 }

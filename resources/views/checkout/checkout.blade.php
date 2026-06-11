@@ -26,27 +26,83 @@
             </div>
 
             @guest
-                {{-- ===================== GUEST ===================== --}}
-                <div class="mx-auto mt-10 grid max-w-5xl gap-6 lg:grid-cols-3">
+                {{-- ===================== GUEST: INLINE SIGN UP / SIGN IN ===================== --}}
+                {{-- The customer authenticates right here — no redirect, the cart is kept. --}}
+                <div
+                    x-data="checkoutAuth(@js([
+                        'mode' => 'register',
+                        'registerUrl' => route('checkout.register'),
+                        'loginUrl' => route('checkout.login'),
+                    ]))"
+                    class="mx-auto mt-10 grid max-w-5xl gap-6 lg:grid-cols-3"
+                >
                     <div class="space-y-3 lg:col-span-2">
-                        {{-- Step 1: Sign up / sign in (active) --}}
+                        {{-- Step 1: Account (active) --}}
                         <div class="rounded-[14px] border border-primary-500 bg-white shadow-soft">
                             <div class="flex items-center justify-between gap-4 px-5 py-4">
                                 <div class="flex items-center gap-3">
                                     <span class="grid h-7 w-7 place-items-center rounded-full bg-primary-500 text-sm font-bold text-white">1</span>
-                                    <h2 class="text-base font-bold">Sign up</h2>
+                                    <h2 class="text-base font-bold">Your account</h2>
                                 </div>
-                                <p class="text-sm text-slate-500">Already have an account?
-                                    <a href="{{ route('login') }}" class="font-semibold text-primary-600 hover:underline">Sign in</a>
-                                </p>
+                                <div class="inline-flex rounded-[10px] border border-slate-200 p-0.5 text-sm font-semibold" role="tablist" aria-label="Create an account or sign in">
+                                    <button type="button" @click="switchTo('register')" role="tab" x-bind:aria-selected="mode === 'register'"
+                                            class="rounded-[8px] px-3 py-1.5 transition"
+                                            x-bind:class="mode === 'register' ? 'bg-primary-500 text-white' : 'text-slate-600 hover:text-primary-600'">
+                                        Create account
+                                    </button>
+                                    <button type="button" @click="switchTo('login')" role="tab" x-bind:aria-selected="mode === 'login'"
+                                            class="rounded-[8px] px-3 py-1.5 transition"
+                                            x-bind:class="mode === 'login' ? 'bg-primary-500 text-white' : 'text-slate-600 hover:text-primary-600'">
+                                        Sign in
+                                    </button>
+                                </div>
                             </div>
+
                             <div class="border-t border-slate-100 px-5 py-5">
-                                <p class="text-sm text-slate-600">You'll need an account to complete your order and manage your domain, hosting and website afterwards.</p>
-                                <div class="mt-4 flex flex-col gap-3 sm:flex-row">
-                                    <a href="{{ route('register') }}" class="btn-primary sm:flex-1">Create an account</a>
-                                    <a href="{{ route('login') }}" class="btn-secondary sm:flex-1">Sign in</a>
-                                </div>
-                                <p class="mt-4 text-xs text-slate-500">We'll verify your email, so keep your inbox accessible. Your cart is saved and waiting for you after you sign in.</p>
+                                <div class="alert alert-danger mb-4" role="alert" x-show="formError" x-text="formError" x-cloak></div>
+
+                                {{-- Create account (inline) --}}
+                                <form x-show="mode === 'register'" x-ref="registerForm" @submit.prevent="submitRegister()" class="space-y-4" novalidate>
+                                    <p class="text-sm text-slate-600">Create your account to manage your domain, hosting and website — you'll stay right here and continue to payment.</p>
+                                    <x-checkout-field name="name" label="Full name" autocomplete="name" :required="true" />
+                                    <x-checkout-field name="email" label="Email address" type="email" autocomplete="email" :required="true" />
+                                    <div class="grid gap-4 sm:grid-cols-2">
+                                        <x-checkout-field name="password" label="Password" type="password" autocomplete="new-password" :required="true" help="At least 10 characters with upper & lower case, a number and a symbol." />
+                                        <x-checkout-field name="password_confirmation" label="Confirm password" type="password" autocomplete="new-password" :required="true" />
+                                    </div>
+                                    <div class="flex items-start gap-3">
+                                        <input type="checkbox" id="ca_terms" name="terms" value="1" class="mt-1 h-5 w-5 rounded border-slate-300 text-primary-500 focus:ring-primary-500" aria-describedby="ca_terms_err">
+                                        <label for="ca_terms" class="text-sm text-slate-600">
+                                            I agree to the <a href="{{ route('legal.terms') }}" target="_blank" rel="noopener" class="font-medium text-primary-600 hover:underline">Terms of Use</a>
+                                            and <a href="{{ route('legal.renewal') }}" target="_blank" rel="noopener" class="font-medium text-primary-600 hover:underline">Renewal Policy</a>.
+                                        </label>
+                                    </div>
+                                    <p id="ca_terms_err" class="field-error" role="alert" x-show="fieldError('terms')" x-text="fieldError('terms')" x-cloak></p>
+
+                                    <button type="submit" class="btn-primary w-full sm:w-auto" x-bind:disabled="submitting">
+                                        <span x-show="!submitting">Create account &amp; continue</span>
+                                        <span x-show="submitting" x-cloak>Creating your account…</span>
+                                    </button>
+                                    <p class="text-xs text-slate-500">We'll email you a verification link in the background — it never holds up your order.</p>
+                                </form>
+
+                                {{-- Sign in (inline) --}}
+                                <form x-show="mode === 'login'" x-cloak x-ref="loginForm" @submit.prevent="submitLogin()" class="space-y-4" novalidate>
+                                    <p class="text-sm text-slate-600">Welcome back — sign in to continue with your order. Your cart is safe.</p>
+                                    <x-checkout-field name="email" label="Email address" type="email" autocomplete="email" :required="true" />
+                                    <x-checkout-field name="password" label="Password" type="password" autocomplete="current-password" :required="true" />
+                                    <div class="flex items-center justify-between gap-4">
+                                        <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                            <input type="checkbox" name="remember" value="1" class="h-5 w-5 rounded border-slate-300 text-primary-500 focus:ring-primary-500">
+                                            Remember me
+                                        </label>
+                                        <a href="{{ route('password.request') }}" target="_blank" rel="noopener" class="text-sm font-medium text-primary-600 hover:underline">Forgot password?</a>
+                                    </div>
+                                    <button type="submit" class="btn-primary w-full sm:w-auto" x-bind:disabled="submitting">
+                                        <span x-show="!submitting">Sign in &amp; continue</span>
+                                        <span x-show="submitting" x-cloak>Signing you in…</span>
+                                    </button>
+                                </form>
                             </div>
                         </div>
 
@@ -66,27 +122,7 @@
                     </aside>
                 </div>
             @else
-                @if (! auth()->user()->hasVerifiedEmail())
-                    {{-- ===================== UNVERIFIED ===================== --}}
-                    <div class="mx-auto mt-10 grid max-w-5xl gap-6 lg:grid-cols-3">
-                        <div class="lg:col-span-2">
-                            <div class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-soft">
-                                <div class="alert alert-warning" role="alert">
-                                    <strong class="font-semibold">Please verify your email address before paying.</strong>
-                                    <p class="mt-1">We sent a verification link to <span class="font-medium">{{ auth()->user()->email }}</span>.</p>
-                                </div>
-                                <form method="POST" action="{{ route('verification.send') }}" class="mt-4">
-                                    @csrf
-                                    <button type="submit" class="btn-primary">Resend verification email</button>
-                                </form>
-                            </div>
-                        </div>
-                        <aside class="lg:col-span-1" aria-label="Order summary">
-                            @include('checkout.partials.summary', ['showPay' => false, 'lineItems' => $lineItems, 'total' => $total, 'freeYearNotice' => $freeYearNotice])
-                        </aside>
-                    </div>
-                @else
-                    {{-- ===================== AUTHENTICATED + VERIFIED ===================== --}}
+                {{-- ===================== AUTHENTICATED ===================== --}}
                     <div
                         x-data="checkout(@js([
                             'intentUrl' => route('checkout.payment-intent'),
@@ -245,7 +281,6 @@
                             @include('checkout.partials.summary', ['showPay' => true, 'lineItems' => $lineItems, 'total' => $total, 'freeYearNotice' => $freeYearNotice])
                         </aside>
                     </div>
-                @endif
             @endguest
         </div>
     </section>

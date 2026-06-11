@@ -13,11 +13,13 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 | Customer Dashboard Routes
 |--------------------------------------------------------------------------
-| All routes require an authenticated, email-verified customer. Row-level
-| ownership is enforced by policies + route-model binding scoping inside
-| each controller — a customer can only ever see their own records.
+| All routes require an authenticated customer. Email verification is
+| encouraged via a persistent banner but never locks a paying customer out
+| of their dashboard or services. Row-level ownership is enforced by
+| policies + query scoping inside each controller — a customer can only
+| ever see their own records.
 */
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::prefix('dashboard')->name('customer.')->group(function () {
@@ -46,6 +48,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('support', [SupportTicketController::class, 'store'])->middleware('throttle:10,1')->name('support.store');
         Route::get('support/{ticket}', [SupportTicketController::class, 'show'])->name('support.show');
         Route::post('support/{ticket}/reply', [SupportTicketController::class, 'reply'])->middleware('throttle:20,1')->name('support.reply');
+        Route::get('support/{ticket}/attachments/{attachment}', [SupportTicketController::class, 'downloadAttachment'])->name('support.attachments.download');
 
         // Account settings
         Route::get('settings', [AccountSettingsController::class, 'edit'])->name('settings.edit');

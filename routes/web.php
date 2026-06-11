@@ -54,16 +54,17 @@ Route::prefix('cart')->name('cart.')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| Checkout (auth + verified email required before paying)
+| Checkout (auth required before paying — email verification is NOT a
+| precondition: it happens in the background and never blocks a purchase)
 |--------------------------------------------------------------------------
 */
 Route::prefix('checkout')->name('checkout.')->group(function () {
     Route::get('/', [CheckoutController::class, 'index'])->name('index');
 
     // On-site payment: creates/reuses the order + Stripe PaymentIntent and
-    // returns its client_secret. Auth + verified email required before paying.
+    // returns its client_secret. Requires a signed-in customer only.
     Route::post('/payment-intent', [CheckoutController::class, 'paymentIntent'])
-        ->middleware(['auth', 'verified', 'throttle:10,1'])
+        ->middleware(['auth', 'throttle:10,1'])
         ->name('payment-intent');
 
     Route::get('/success', [CheckoutController::class, 'success'])->name('success');

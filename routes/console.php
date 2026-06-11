@@ -23,6 +23,7 @@ Schedule::command('hosting:sync')->dailyAt('03:00')->withoutOverlapping();
 // Auto-retry transient provisioning failures (never manual-review steps).
 Schedule::command('provisioning:retry-failed')->hourly()->withoutOverlapping();
 
-// Self-heal: finish any paid order whose provisioning stalled (e.g. a webhook
-// that landed but a step never ran). Manual-review orders are left for a human.
+// Self-heal: finish any paid order whose provisioning stalled, AND verify
+// recent "pending" orders that reached Stripe against the Stripe API — rescuing
+// payments whose webhook never arrived. Manual-review orders are left for a human.
 Schedule::command('orders:provision --stuck')->everyTenMinutes()->withoutOverlapping();

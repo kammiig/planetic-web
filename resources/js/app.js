@@ -220,6 +220,94 @@ Alpine.data('checkout', (config = {}) => ({
 
 /*
 |--------------------------------------------------------------------------
+| Inline checkout authentication
+|--------------------------------------------------------------------------
+| Lets a guest create an account or sign in WITHOUT leaving the checkout.
+| On success the page reloads: the session cart survives authentication
+| (cart_id is kept through session regeneration and claimed by the user),
+| so the customer lands back on checkout at the next step, signed in.
+*/
+Alpine.data('checkoutAuth', (config = {}) => ({
+    mode: config.mode || 'register', // 'register' | 'login'
+    registerUrl: config.registerUrl,
+    loginUrl: config.loginUrl,
+    submitting: false,
+    formError: '',
+    fieldErrors: {},
+
+    switchTo(mode) {
+        this.mode = mode;
+        this.formError = '';
+        this.fieldErrors = {};
+    },
+    fieldError(name) {
+        return (this.fieldErrors[name] && this.fieldErrors[name][0]) || '';
+    },
+    csrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    },
+
+    async submit(form, url) {
+        this.formError = '';
+        this.fieldErrors = {};
+        this.submitting = true;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': this.csrfToken(),
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: new FormData(form),
+            });
+
+            if (response.status === 422) {
+                const body = await response.json();
+                this.fieldErrors = body.errors || {};
+                this.formError = body.message || 'Please check the highlighted fields and try again.';
+                this.focusFirstError(form);
+                return;
+            }
+
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                this.formError = body.message || body.error || 'Something went wrong. Please try again in a moment.';
+                return;
+            }
+
+            // Signed in — reload checkout. The session cart is preserved, the
+            // server now renders the authenticated steps (plan → billing → pay).
+            window.location.reload();
+        } catch (error) {
+            this.formError = 'Network error — please check your connection and try again.';
+        } finally {
+            this.submitting = false;
+        }
+    },
+
+    submitRegister() {
+        this.submit(this.$refs.registerForm, this.registerUrl);
+    },
+    submitLogin() {
+        this.submit(this.$refs.loginForm, this.loginUrl);
+    },
+
+    focusFirstError(form) {
+        this.$nextTick(() => {
+            const first = Object.keys(this.fieldErrors)[0];
+            if (first && form) {
+                const el = form.querySelector('[name="' + first + '"]');
+                if (el) el.focus();
+            }
+        });
+    },
+}));
+
+/*
+|--------------------------------------------------------------------------
 | Domain search page
 |--------------------------------------------------------------------------
 | Drives the full domain-search experience (exact match + bundle cards +

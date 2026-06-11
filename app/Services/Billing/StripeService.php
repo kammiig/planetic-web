@@ -152,6 +152,61 @@ class StripeService
     }
 
     /**
+     * Ask Stripe (server-to-server, never trusting the browser) whether this
+     * order's payment has actually succeeded. Returns the completion context
+     * for CompletePaidOrder when it has, or null when it has not / cannot be
+     * verified. Used by the success page, the recovery command and the
+     * scheduled stuck-order sweep, so a missing webhook can never strand a
+     * paid order.
+     *
+     * @return array{payment_intent?: string, session_id?: string, customer?: string}|null
+     */
+    public function findSucceededPayment(Order $order): ?array
+    {
+        if (blank(config('stripe.secret_key'))) {
+            Log::channel('stack')->warning('Cannot verify payment with Stripe: STRIPE_SECRET_KEY is not set.', [
+                'order' => $order->order_number,
+            ]);
+
+            return null;
+        }
+
+        $client = $this->client();
+
+        try {
+            if (filled($order->stripe_payment_intent_id)) {
+                $intent = $client->paymentIntents->retrieve($order->stripe_payment_intent_id);
+
+                if (($intent->status ?? null) === 'succeeded') {
+                    return array_filter([
+                        'payment_intent' => $intent->id,
+                        'customer' => is_string($intent->customer ?? null) ? $intent->customer : null,
+                    ]);
+                }
+            }
+
+            if (filled($order->stripe_checkout_session_id)) {
+                $session = $client->checkout->sessions->retrieve($order->stripe_checkout_session_id);
+
+                if (($session->payment_status ?? null) === 'paid') {
+                    return array_filter([
+                        'session_id' => $session->id,
+                        'payment_intent' => is_string($session->payment_intent ?? null) ? $session->payment_intent : null,
+                        'customer' => is_string($session->customer ?? null) ? $session->customer : null,
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::channel('stack')->warning('Stripe payment verification lookup failed.', [
+                'order' => $order->order_number,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
      * Verify a webhook payload against the signing secret and return the event.
      *
      * @throws \UnexpectedValueException|\Stripe\Exception\SignatureVerificationException

@@ -4,8 +4,11 @@ namespace App\Services\Provisioning;
 
 use App\Enums\OrderStatus;
 use App\Enums\ProvisioningJobType;
+use App\Mail\ProvisioningIssueMail;
 use App\Models\Order;
 use App\Models\ProvisioningJob;
+use App\Services\Notifications\AdminNotifier;
+use App\Services\Notifications\NotificationService;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -49,7 +52,10 @@ class ProvisioningLogger
         // Surface the failure on the order so the customer sees a safe
         // "being reviewed" state and admins can act.
         $order = $job->order;
+        $firstEscalation = false;
+
         if ($order && $order->status !== OrderStatus::Completed) {
+            $firstEscalation = $order->status !== OrderStatus::ManualReview;
             $order->forceFill(['status' => OrderStatus::ManualReview->value])->save();
         }
 
@@ -59,6 +65,31 @@ class ProvisioningLogger
             'manual_review' => $manualReview,
             'error' => $message,
         ]);
+
+        // Tell the admin team immediately (failure details stay internal) …
+        app(AdminNotifier::class)->alert(
+            'Provisioning step failed: '.$job->job_type->value,
+            'A provisioning step needs attention. The customer sees a safe "manual review" state; the service record stays visible in their dashboard.',
+            array_filter([
+                'Order' => $order?->order_number,
+                'Customer' => $order?->user?->email,
+                'Step' => $job->job_type->value,
+                'Attempts' => (string) $job->attempts,
+                'Needs manual review' => $manualReview ? 'yes' : 'no (auto-retry eligible)',
+                'Error' => $message,
+            ]),
+            url('/admin/provisioning-jobs'),
+            'Open provisioning monitor',
+        );
+
+        // … and reassure the customer once (first escalation only, never spam).
+        if ($firstEscalation && $order && $order->user) {
+            app(NotificationService::class)->send(
+                $order->user,
+                new ProvisioningIssueMail($order),
+                'provisioning_issue',
+            );
+        }
     }
 
     /**

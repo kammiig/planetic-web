@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\CheckoutAuthController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
@@ -31,6 +32,22 @@ Route::middleware('guest')->group(function () {
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
     Route::post('reset-password', [NewPasswordController::class, 'store'])->name('password.store');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Inline Checkout Authentication (AJAX — the customer never leaves checkout)
+|--------------------------------------------------------------------------
+| Deliberately NOT behind the guest middleware: an already-authenticated
+| double submit simply returns ok instead of a redirect the fetch() caller
+| could not follow.
+*/
+Route::post('checkout/register', [CheckoutAuthController::class, 'register'])
+    ->middleware('throttle:6,1')
+    ->name('checkout.register');
+
+Route::post('checkout/login', [CheckoutAuthController::class, 'login'])
+    ->middleware('throttle:6,1')
+    ->name('checkout.login');
 
 /*
 |--------------------------------------------------------------------------

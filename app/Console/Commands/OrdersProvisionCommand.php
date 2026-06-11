@@ -60,10 +60,16 @@ class OrdersProvisionCommand extends Command
         // 1. Not yet paid → confirm with Stripe. A missing webhook is the usual
         //    reason an order is stuck "pending".
         if (! $order->isPaid()) {
-            if ($this->confirmPaymentWithStripe($order, $stripe)) {
+            $context = $stripe->findSucceededPayment($order);
+
+            if ($context !== null) {
                 $this->line('  Payment confirmed with Stripe.');
             } elseif ($this->option('mark-paid')) {
                 $this->warn('  Could not confirm with Stripe — proceeding because --mark-paid was given.');
+                $context = array_filter([
+                    'payment_intent' => $order->stripe_payment_intent_id,
+                    'session_id' => $order->stripe_checkout_session_id,
+                ]);
             } else {
                 $this->warn('  No successful Stripe charge found for this order.');
                 $this->warn('  Verify it in the Stripe dashboard, then re-run with --mark-paid to force.');
@@ -73,10 +79,7 @@ class OrdersProvisionCommand extends Command
 
             try {
                 // CompletePaidOrder marks paid, creates records and provisions.
-                $complete->handle($order->fresh('items'), array_filter([
-                    'payment_intent' => $order->stripe_payment_intent_id,
-                    'session_id' => $order->stripe_checkout_session_id,
-                ]));
+                $complete->handle($order->fresh('items'), $context);
             } catch (Throwable $e) {
                 $this->error("  CompletePaidOrder failed: {$e->getMessage()}");
             }
@@ -106,39 +109,6 @@ class OrdersProvisionCommand extends Command
         }
 
         $this->report($order->fresh());
-    }
-
-    private function confirmPaymentWithStripe(Order $order, StripeService $stripe): bool
-    {
-        if (blank(config('stripe.secret_key'))) {
-            $this->warn('  STRIPE_SECRET_KEY is not set — cannot verify payment with Stripe.');
-
-            return false;
-        }
-
-        try {
-            if (filled($order->stripe_payment_intent_id)) {
-                $intent = $stripe->client()->paymentIntents->retrieve($order->stripe_payment_intent_id);
-                if (($intent->status ?? null) === 'succeeded') {
-                    return true;
-                }
-            }
-
-            if (filled($order->stripe_checkout_session_id)) {
-                $session = $stripe->client()->checkout->sessions->retrieve($order->stripe_checkout_session_id);
-                if (($session->payment_status ?? null) === 'paid') {
-                    if (blank($order->stripe_payment_intent_id) && filled($session->payment_intent ?? null)) {
-                        $order->forceFill(['stripe_payment_intent_id' => $session->payment_intent])->save();
-                    }
-
-                    return true;
-                }
-            }
-        } catch (Throwable $e) {
-            $this->warn("  Stripe lookup failed: {$e->getMessage()}");
-        }
-
-        return false;
     }
 
     /** Reset failed / manual-review / stuck-running steps so the chain re-runs them. */
@@ -187,7 +157,7 @@ class OrdersProvisionCommand extends Command
             // Self-heal paid orders that never finished. Manual-review orders are
             // deliberately excluded — they await a human / the hourly failed-step
             // retry, so we never hammer external APIs on a known-bad order.
-            return Order::with('items')
+            $paidIncomplete = Order::with('items')
                 ->where(fn ($q) => $q->whereNotNull('paid_at')->orWhere('payment_status', PaymentStatus::Succeeded->value))
                 ->whereNotIn('status', [
                     OrderStatus::Completed->value,
@@ -196,6 +166,21 @@ class OrdersProvisionCommand extends Command
                     OrderStatus::ManualReview->value,
                 ])
                 ->get();
+
+            // ALSO sweep recent "pending" orders that reached Stripe (they have a
+            // PaymentIntent / session id) but were never marked paid — the classic
+            // signature of a webhook that never arrived. Each is verified against
+            // the Stripe API before anything happens, so an abandoned checkout is
+            // simply skipped. Bounded to 30 days to keep the sweep cheap.
+            $unpaidCandidates = Order::with('items')
+                ->whereNull('paid_at')
+                ->where('payment_status', '!=', PaymentStatus::Succeeded->value)
+                ->where('status', OrderStatus::Pending->value)
+                ->where(fn ($q) => $q->whereNotNull('stripe_payment_intent_id')->orWhereNotNull('stripe_checkout_session_id'))
+                ->where('created_at', '>=', now()->subDays(30))
+                ->get();
+
+            return $paidIncomplete->merge($unpaidCandidates)->unique('id')->values();
         }
 
         $key = (string) $this->argument('order');

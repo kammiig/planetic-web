@@ -3,10 +3,15 @@
 Automated **website, hosting, domain, DNS, billing, renewal and client-management** platform.
 
 Customers search a domain, buy a complete bespoke website (£200) or hosting, pay securely through
-Stripe, and — only after a **verified Stripe webhook** — the platform automatically registers the
-domain (NameSilo), creates a Cloudflare DNS zone, points the registrar nameservers at Cloudflare,
-provisions a cPanel account via WHM, creates the default DNS records, and emails the customer. Everything
-is visible in a customer dashboard and a Filament admin panel.
+Stripe, and — once the charge is **verified server-to-server with the Stripe API** — the platform
+automatically registers the domain (NameSilo), creates a Cloudflare DNS zone, points the registrar
+nameservers at Cloudflare, provisions a cPanel account via WHM, creates the default DNS records, and
+emails the customer. Everything is visible in a customer dashboard and a Filament admin panel.
+
+Payment is confirmed through **three independent, idempotent paths** (whichever runs first wins —
+the others become no-ops): the signed Stripe webhook, the checkout success page (which asks the
+Stripe API directly — the browser is never trusted), and the every-10-minutes
+`orders:provision --stuck` sweep. A missing webhook can therefore never strand a paid order.
 
 > **Business rule:** the £200 website package includes **“Free domain and hosting for the first year.
 > Renewal applies after the first year.”** — never marketed as free forever.
@@ -35,7 +40,7 @@ is visible in a customer dashboard and a Filament admin panel.
 - **Service classes** wrap every third-party API (`app/Services/{Billing,Registrar,Hosting,DNS,Provisioning,Renewals,Notifications}`). Controllers never call third-party APIs directly.
 - **Provisioning** runs as an idempotent, retryable queued chain (`app/Jobs/Provisioning`) orchestrated by `ProvisioningOrchestrator`; every step is logged in `provisioning_jobs` and visible/retryable in the admin panel.
 - **Row-level security:** every customer-owned model uses the `BelongsToUser` trait; controllers scope queries to the owner (404 hides existence) and Laravel policies gate everything (including the Filament panel).
-- **Webhook safety:** Stripe signatures are verified, event IDs stored (`stripe_events`) for idempotency, and **services are only provisioned after a verified webhook — never from the success page**.
+- **Payment safety:** the browser's word is never trusted. Stripe webhook signatures are verified and event IDs stored (`stripe_events`) for idempotency; the success page and the scheduled sweep both confirm the charge **server-to-server with the Stripe API** before completing an order, and completion itself is guarded by a row lock + `isPaid()` check so it runs exactly once.
 
 ```
 Frontend → Laravel backend → Third-party API     (API keys never reach the browser)
@@ -143,10 +148,12 @@ compiled `public/build` directory.
 ```
 
 > **Provisioning runs synchronously by default** (`PROVISIONING_SYNC=true`), so a customer's
-> services are created the instant the verified Stripe webhook arrives — **no queue worker is
-> required** for provisioning. Keep the queue cron above for other background jobs, and the
-> scheduler cron (which also runs `orders:provision --stuck` every 10 min to finish any order
-> whose provisioning stalled). Set `PROVISIONING_SYNC=false` only if you run a dedicated worker.
+> services are created the instant payment is confirmed (webhook **or** success page **or** sweep) —
+> **no queue worker is required** for provisioning. Keep the queue cron above for other background
+> jobs, and the scheduler cron (which also runs `orders:provision --stuck` every 10 min: it finishes
+> any paid order whose provisioning stalled AND verifies recent "pending" orders against the Stripe
+> API to rescue payments whose webhook never arrived). Set `PROVISIONING_SYNC=false` only if you
+> run a dedicated worker.
 
 ### 5. Stripe webhook
 
@@ -159,6 +166,10 @@ https://planeticweb.com/webhooks/stripe
 Subscribe to: `checkout.session.completed`, `payment_intent.succeeded`,
 `payment_intent.payment_failed`, `invoice.paid`, `invoice.payment_failed`,
 `customer.subscription.created/updated/deleted`. Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+> The webhook is the fastest completion path but no longer a single point of failure: the success
+> page and the 10-minute sweep also verify payments directly with the Stripe API. Configure the
+> webhook anyway — it covers failed payments (`payment_intent.payment_failed`) and renewals.
 
 ### 6. WHM package names
 
@@ -190,7 +201,7 @@ Common causes of a stuck order and the fix:
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| Order stays "pending", tabs empty | Stripe webhook not configured / wrong `STRIPE_WEBHOOK_SECRET` | Add the endpoint (step 5), set the secret, then `orders:provision ORD-xxxx` for past orders |
+| Order stays "pending", tabs empty | Webhook missing AND customer never returned to the success page AND scheduler cron not running | Check the scheduler cron (step 4) — the 10-min sweep self-heals this; or run `orders:provision ORD-xxxx` immediately |
 | Order "provisioning" but a service missing | A provisioning step failed (registrar/WHM/Cloudflare error or missing API key) | `orders:debug ORD-xxxx` to see the error; fix config; `orders:provision ORD-xxxx` to retry |
 | Want to test the full flow without registrar/WHM/Cloudflare keys | — | Set `PROVISIONING_DRY_RUN=true` to simulate provisioning with Stripe test keys only |
 

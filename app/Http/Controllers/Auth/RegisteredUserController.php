@@ -44,11 +44,15 @@ class RegisteredUserController extends Controller
 
         $user->assignRole(RoleName::Customer);
 
+        // Sends the verification email in the background (never throws) — the
+        // customer continues straight to their destination and verifies later.
         event(new Registered($user));
 
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('verification.notice');
+        // intended() honours a checkout (or any guarded page) the visitor came
+        // from; verification is encouraged by a dashboard banner, not a wall.
+        return redirect()->intended(route('dashboard'));
     }
 }

@@ -19,13 +19,14 @@
         </div>
     @endforeach
 
-    {{-- Stat cards --}}
-    <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {{-- Stat cards (active count + a pending hint so paid services are never "0") --}}
+    <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         @foreach ([
-            ['label' => 'Active domains', 'value' => $domainsCount, 'href' => route('customer.domains.index'), 'icon' => 'M3 12h18M12 3a15 15 0 0 1 0 18M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z'],
-            ['label' => 'Active hosting', 'value' => $hostingCount, 'href' => route('customer.hosting.index'), 'icon' => 'M3 5h18v6H3zM3 13h18v6H3z'],
-            ['label' => 'Open invoices', 'value' => $openInvoicesCount, 'href' => route('customer.billing.index'), 'icon' => 'M3 6h18v12H3zM3 10h18'],
-            ['label' => 'Open tickets', 'value' => $openTicketsCount, 'href' => route('customer.support.index'), 'icon' => 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
+            ['label' => 'Active domains', 'value' => $domainsCount, 'pending' => $pendingDomainsCount, 'href' => route('customer.domains.index'), 'icon' => 'M3 12h18M12 3a15 15 0 0 1 0 18M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z'],
+            ['label' => 'Active hosting', 'value' => $hostingCount, 'pending' => $pendingHostingCount, 'href' => route('customer.hosting.index'), 'icon' => 'M3 5h18v6H3zM3 13h18v6H3z'],
+            ['label' => 'Website projects', 'value' => $projectsCount, 'pending' => 0, 'href' => route('customer.projects.index'), 'icon' => 'M4 4h16v12H4zM2 20h20M9 8h6M9 12h6'],
+            ['label' => 'Open invoices', 'value' => $openInvoicesCount, 'pending' => 0, 'href' => route('customer.billing.index'), 'icon' => 'M3 6h18v12H3zM3 10h18'],
+            ['label' => 'Open tickets', 'value' => $openTicketsCount, 'pending' => 0, 'href' => route('customer.support.index'), 'icon' => 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
         ] as $stat)
             <a href="{{ $stat['href'] }}" class="card-dash transition hover:shadow-soft">
                 <div class="flex items-center justify-between">
@@ -34,7 +35,12 @@
                     </span>
                     <span class="text-3xl font-extrabold text-slate-900">{{ $stat['value'] }}</span>
                 </div>
-                <p class="mt-3 text-sm font-medium text-slate-600">{{ $stat['label'] }}</p>
+                <p class="mt-3 text-sm font-medium text-slate-600">
+                    {{ $stat['label'] }}
+                    @if ($stat['pending'] > 0)
+                        <span class="ml-1 inline-flex items-center rounded-full bg-warning/15 px-2 py-0.5 text-xs font-semibold text-amber-700">+{{ $stat['pending'] }} pending</span>
+                    @endif
+                </p>
             </a>
         @endforeach
     </div>

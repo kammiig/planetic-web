@@ -32,7 +32,9 @@ class RegistrationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
-        $response->assertRedirect(route('verification.notice'));
+        // Verification must never block the journey: the user continues straight
+        // to their destination while the verification email goes out behind them.
+        $response->assertRedirect(route('dashboard'));
 
         $user = User::where('email', 'jane@example.com')->firstOrFail();
         $this->assertTrue($user->hasRole('customer'));

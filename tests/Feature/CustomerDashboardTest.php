@@ -28,11 +28,16 @@ class CustomerDashboardTest extends TestCase
         $this->get('/dashboard')->assertRedirect(route('login'));
     }
 
-    public function test_unverified_users_cannot_access_dashboard(): void
+    public function test_unverified_users_see_dashboard_with_verification_banner(): void
     {
         $user = $this->createUser(RoleName::Customer, ['email_verified_at' => null]);
 
-        $this->actingAs($user)->get('/dashboard')->assertRedirect(route('verification.notice'));
+        // Verification is encouraged, never a wall: the dashboard loads and a
+        // persistent banner (with a resend button) asks them to verify.
+        $this->actingAs($user)->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Please verify your email address.')
+            ->assertSee('Resend verification email');
     }
 
     public function test_verified_customer_can_view_their_dashboard(): void

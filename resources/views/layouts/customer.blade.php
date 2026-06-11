@@ -54,6 +54,14 @@
                         </li>
                     @endforeach
                 </ul>
+
+                <div class="mt-3 border-t border-white/10 pt-3">
+                    <a href="{{ route('home') }}" target="_blank" rel="noopener"
+                       class="flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white">
+                        <svg class="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/></svg>
+                        Visit website
+                    </a>
+                </div>
             </nav>
 
             <div class="absolute inset-x-0 bottom-0 border-t border-white/10 p-3">
@@ -78,6 +86,11 @@
                 </button>
                 <h1 class="truncate text-lg font-bold text-slate-900">@yield('page-title', 'Dashboard')</h1>
                 <div class="flex items-center gap-3">
+                    <a href="{{ route('home') }}" target="_blank" rel="noopener"
+                       class="hidden items-center gap-1.5 rounded-[10px] border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:border-primary-300 hover:text-primary-600 sm:inline-flex">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/></svg>
+                        Visit website
+                    </a>
                     <span class="hidden text-sm text-slate-500 sm:inline">{{ auth()->user()?->name }}</span>
                     <span class="grid h-9 w-9 place-items-center rounded-full bg-primary-100 text-sm font-bold text-primary-600" aria-hidden="true">
                         {{ strtoupper(substr(auth()->user()?->name ?? 'U', 0, 1)) }}
@@ -87,6 +100,20 @@
 
             <main id="main-content" class="flex-1">
                 <div class="container-dash py-6 sm:py-8">
+                    @if (auth()->check() && ! auth()->user()->hasVerifiedEmail())
+                        <div class="alert alert-warning mb-4 flex flex-wrap items-center justify-between gap-3" role="status">
+                            <span>
+                                <strong class="font-semibold">Please verify your email address.</strong>
+                                We sent a link to {{ auth()->user()->email }} — verifying keeps your account secure. Your services are not affected.
+                            </span>
+                            <form method="POST" action="{{ route('verification.send') }}">
+                                @csrf
+                                <button type="submit" class="whitespace-nowrap rounded-[10px] border border-warning/40 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:border-warning">
+                                    Resend verification email
+                                </button>
+                            </form>
+                        </div>
+                    @endif
                     @include('partials.flash')
                     @yield('content')
                 </div>
