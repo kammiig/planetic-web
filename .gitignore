@@ -14,7 +14,9 @@
 /.zed
 /auth.json
 /node_modules
-/public/build
+# NOTE: public/build is deliberately COMMITTED — the cPanel server has no
+# Node, so deploys ship the locally-built assets. Run `npm run build` and
+# commit the result whenever CSS/JS changes.
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
