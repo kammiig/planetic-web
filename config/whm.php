@@ -23,7 +23,7 @@ return [
 
     'verify_ssl' => filter_var(env('WHM_VERIFY_SSL', true), FILTER_VALIDATE_BOOL),
 
-    'default_package' => env('WHM_DEFAULT_PACKAGE', 'planetic_starter'),
+    'default_package' => env('WHM_DEFAULT_PACKAGE', 'kwashqap_starter'),
 
     'server_ip' => env('WHM_SERVER_IP'),
 

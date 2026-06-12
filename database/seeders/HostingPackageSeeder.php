@@ -17,7 +17,7 @@ class HostingPackageSeeder extends Seeder
     {
         $packages = [
             'Starter Hosting' => [
-                'whm_package_name' => 'planetic_starter',
+                'whm_package_name' => 'kwashqap_starter',
                 'disk_limit_mb' => 10240,
                 'bandwidth_limit_mb' => 102400,
                 'email_accounts_limit' => 10,
@@ -25,7 +25,7 @@ class HostingPackageSeeder extends Seeder
                 'domain_limit' => 1,
             ],
             'Business Hosting' => [
-                'whm_package_name' => 'planetic_business',
+                'whm_package_name' => 'kwashqap_Business',
                 'disk_limit_mb' => 51200,
                 'bandwidth_limit_mb' => 512000,
                 'email_accounts_limit' => 50,
@@ -33,7 +33,7 @@ class HostingPackageSeeder extends Seeder
                 'domain_limit' => 5,
             ],
             'Pro Hosting' => [
-                'whm_package_name' => 'planetic_pro',
+                'whm_package_name' => 'kwashqap_Pro',
                 'disk_limit_mb' => 102400,
                 'bandwidth_limit_mb' => 1024000,
                 'email_accounts_limit' => 200,
@@ -41,7 +41,7 @@ class HostingPackageSeeder extends Seeder
                 'domain_limit' => 15,
             ],
             'Agency / Ecommerce Hosting' => [
-                'whm_package_name' => 'planetic_agency',
+                'whm_package_name' => 'kwashqap_Agency Ecommerce',
                 'disk_limit_mb' => 204800,
                 'bandwidth_limit_mb' => null, // unmetered
                 'email_accounts_limit' => null,

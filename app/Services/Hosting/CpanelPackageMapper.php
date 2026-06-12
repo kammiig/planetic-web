@@ -19,7 +19,7 @@ class CpanelPackageMapper
             return $package->whm_package_name;
         }
 
-        return config('hosting.default_package', 'planetic_starter');
+        return config('hosting.default_package', 'kwashqap_starter');
     }
 
     /**

@@ -91,16 +91,83 @@ class CartService
         return $item;
     }
 
-    public function removeItem(CartItem $item): void
+    /**
+     * Remove an item from the visitor's own cart. Returns whether anything was
+     * actually removed so callers never show a false success message.
+     *
+     * Int-casts both sides of the ownership check: on MySQL with emulated
+     * prepares the foreign key comes back as a string, and a strict !== against
+     * the int id silently failed — the item stayed while the UI said "removed".
+     */
+    public function removeItem(CartItem $item): bool
     {
         $cart = $this->currentCart();
 
-        if ($item->cart_id !== $cart->id) {
-            return; // never let a visitor remove another cart's item
+        if ((int) $item->cart_id !== (int) $cart->id) {
+            return false; // never let a visitor remove another cart's item
         }
 
         $item->delete();
+
+        $cart->load('items.product.hostingPackage');
+        $this->reconcileDomainChoice($cart);
         $cart->load('items')->recalculate();
+
+        return true;
+    }
+
+    /**
+     * Keep the domain choice coherent after a removal:
+     *  - bundle gone → drop the auto-added domain registration line;
+     *  - registration line gone → clear the "register new" choice from the
+     *    remaining hosting/website items so checkout asks again;
+     *  - bundle changed (e.g. website package removed, hosting kept) →
+     *    re-price the auto-added line (free ↔ paid).
+     */
+    private function reconcileDomainChoice(Cart $cart): void
+    {
+        $carriers = $this->itemsNeedingDomain($cart);
+        $autoLine = $cart->items->first(fn (CartItem $i) => $i->item_type === ItemType::DomainRegistration
+            && ($i->metadata['auto_added'] ?? false));
+
+        if ($carriers->isEmpty()) {
+            $autoLine?->delete();
+
+            return;
+        }
+
+        $source = $carriers->first(fn (CartItem $i) => filled($i->metadata['domain_source'] ?? null))
+            ?->metadata['domain_source'] ?? null;
+
+        if ($source !== 'new') {
+            return; // existing/later choices have no registration line to manage
+        }
+
+        $domain = $carriers->first(fn (CartItem $i) => filled($i->domain_name))?->domain_name;
+        $line = $cart->items->first(fn (CartItem $i) => $i->item_type === ItemType::DomainRegistration
+            && $i->domain_name === $domain);
+
+        if (! $line) {
+            // The registration line itself was removed → the new-domain choice
+            // no longer holds; checkout re-asks before payment.
+            foreach ($carriers as $item) {
+                $meta = $item->metadata ?? [];
+                unset($meta['domain_source']);
+
+                $item->update([
+                    'domain_name' => null,
+                    'metadata' => $meta,
+                    'name' => $item->item_type === ItemType::WebsitePackage ? 'Complete Bespoke Website' : $item->name,
+                ]);
+            }
+
+            return;
+        }
+
+        if ($line->metadata['auto_added'] ?? false) {
+            // Re-price for the remaining bundle (e.g. lost the free-domain perk).
+            $this->ensureDomainLine($cart, $domain);
+        }
     }
 
     /**

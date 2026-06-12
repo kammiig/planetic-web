@@ -38,7 +38,7 @@ class DomainChoiceTest extends TestCase
         config()->set('provisioning.sync', true);
         config()->set('provisioning.dry_run', true);
         config()->set('whm.server_hostname', 'srv1.planeticweb.com');
-        config()->set('hosting.default_package', 'planetic_starter');
+        config()->set('hosting.default_package', 'kwashqap_starter');
     }
 
     private function customer(): User

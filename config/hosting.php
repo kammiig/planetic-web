@@ -14,13 +14,13 @@ return [
     |
     */
 
-    'default_package' => env('WHM_DEFAULT_PACKAGE', 'planetic_starter'),
+    'default_package' => env('WHM_DEFAULT_PACKAGE', 'kwashqap_starter'),
 
     'package_map' => [
-        'starter' => 'planetic_starter',
-        'business' => 'planetic_business',
-        'pro' => 'planetic_pro',
-        'agency' => 'planetic_agency',
+        'starter' => 'kwashqap_starter',
+        'business' => 'kwashqap_Business',
+        'pro' => 'kwashqap_Pro',
+        'agency' => 'kwashqap_Agency Ecommerce',
     ],
 
     /*

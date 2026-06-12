@@ -46,8 +46,8 @@ class ProvisioningRecoveryTest extends TestCase
         config()->set('whm.token', 'whm-token');
         config()->set('whm.server_ip', '203.0.113.10');
         config()->set('whm.server_hostname', 'srv1.planeticweb.com');
-        config()->set('whm.default_package', 'planetic_starter');
-        config()->set('hosting.default_package', 'planetic_starter');
+        config()->set('whm.default_package', 'kwashqap_starter');
+        config()->set('hosting.default_package', 'kwashqap_starter');
     }
 
     private function fakeIntegrations(bool $whmFails = false): void
@@ -89,7 +89,7 @@ class ProvisioningRecoveryTest extends TestCase
 
                 return Http::response([
                     'metadata' => ['result' => 1, 'reason' => 'Account Creation Ok', 'command' => 'createacct'],
-                    'data' => ['ip' => '203.0.113.10', 'nameserver' => 'ns1.planeticweb.com', 'package' => 'planetic_starter'],
+                    'data' => ['ip' => '203.0.113.10', 'nameserver' => 'ns1.planeticweb.com', 'package' => 'kwashqap_starter'],
                 ]);
             }
 

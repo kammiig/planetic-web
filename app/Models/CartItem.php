@@ -16,6 +16,11 @@ class CartItem extends Model
     protected function casts(): array
     {
         return [
+            // Explicit int casts: MySQL with emulated prepares returns these
+            // as strings, which broke strict ownership comparisons.
+            'cart_id' => 'integer',
+            'product_id' => 'integer',
+            'product_price_id' => 'integer',
             'item_type' => ItemType::class,
             'quantity' => 'integer',
             'unit_price' => 'decimal:2',

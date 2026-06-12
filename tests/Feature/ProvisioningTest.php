@@ -32,8 +32,8 @@ class ProvisioningTest extends TestCase
         config()->set('whm.username', 'root');
         config()->set('whm.token', 'whm-token');
         config()->set('whm.server_ip', '203.0.113.10');
-        config()->set('whm.default_package', 'planetic_starter');
-        config()->set('hosting.default_package', 'planetic_starter');
+        config()->set('whm.default_package', 'kwashqap_starter');
+        config()->set('hosting.default_package', 'kwashqap_starter');
     }
 
     private function fakeIntegrations(): void
@@ -72,7 +72,7 @@ class ProvisioningTest extends TestCase
             if (str_contains($url, 'whm.test')) {
                 return Http::response([
                     'metadata' => ['result' => 1, 'reason' => 'Account Creation Ok', 'command' => 'createacct'],
-                    'data' => ['ip' => '203.0.113.10', 'nameserver' => 'ns1.planeticweb.com', 'package' => 'planetic_starter'],
+                    'data' => ['ip' => '203.0.113.10', 'nameserver' => 'ns1.planeticweb.com', 'package' => 'kwashqap_starter'],
                 ]);
             }
 

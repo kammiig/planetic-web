@@ -48,12 +48,16 @@ class CartController extends Controller
 
     public function destroy(Request $request, CartItem $cartItem): JsonResponse|RedirectResponse
     {
-        $this->cart->removeItem($cartItem);
+        $removed = $this->cart->removeItem($cartItem);
 
         if ($request->expectsJson()) {
-            return response()->json(['success' => true]);
+            return $removed
+                ? response()->json(['success' => true])
+                : response()->json(['success' => false, 'message' => 'That item could not be removed. Please refresh the page and try again.'], 422);
         }
 
-        return redirect()->route('cart.index')->with('success', 'Item removed from your cart.');
+        return $removed
+            ? redirect()->route('cart.index')->with('success', 'Item removed from your cart.')
+            : redirect()->route('cart.index')->with('error', 'That item could not be removed. Please refresh the page and try again.');
     }
 }
