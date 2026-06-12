@@ -12,7 +12,7 @@ class HostingController extends Controller
     public function index(Request $request): View
     {
         return view('customer.hosting.index', [
-            'accounts' => $request->user()->hostingAccounts()->with(['hostingPackage', 'order'])->latest()->paginate(15),
+            'accounts' => $request->user()->hostingAccounts()->with(['hostingPackage', 'order', 'domain.cloudflareZone'])->latest()->paginate(15),
         ]);
     }
 
@@ -20,7 +20,7 @@ class HostingController extends Controller
     {
         abort_unless($hostingAccount->isOwnedBy($request->user()), 404);
 
-        $hostingAccount->load('hostingPackage', 'domain');
+        $hostingAccount->load('hostingPackage', 'domain.cloudflareZone', 'order.items');
 
         return view('customer.hosting.show', ['account' => $hostingAccount]);
     }

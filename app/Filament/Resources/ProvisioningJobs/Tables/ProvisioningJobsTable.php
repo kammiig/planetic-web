@@ -24,7 +24,7 @@ class ProvisioningJobsTable
                 TextColumn::make('job_type')->label('Step')->badge(),
                 TextColumn::make('status')->badge(),
                 TextColumn::make('attempts')->formatStateUsing(fn ($state, ProvisioningJob $r) => "{$state}/{$r->max_attempts}"),
-                TextColumn::make('error_message')->label('Error')->limit(40)->toggleable()->wrap(),
+                TextColumn::make('error_message')->label('Error')->limit(80)->tooltip(fn ($record) => $record->error_message)->toggleable()->wrap(),
                 TextColumn::make('failed_at')->dateTime()->since()->sortable()->toggleable(),
                 TextColumn::make('completed_at')->dateTime()->since()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])

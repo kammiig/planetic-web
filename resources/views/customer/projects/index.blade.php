@@ -25,8 +25,20 @@
                         <div><dt class="text-slate-500">Order</dt><dd class="font-medium">{{ $project->order?->order_number ?? '—' }}</dd></div>
                         <div><dt class="text-slate-500">Price paid</dt><dd class="font-medium">{{ $project->order ? '£'.number_format((float) $project->order->total, 2) : '—' }}</dd></div>
                         <div><dt class="text-slate-500">Ordered</dt><dd class="font-medium">{{ $project->order?->paid_at?->format('j M Y') ?? $project->created_at?->format('j M Y') ?? '—' }}</dd></div>
-                        <div><dt class="text-slate-500">Domain</dt><dd class="font-medium">{{ $project->domain?->domain_name ?? '—' }}</dd></div>
+                        <div>
+                            <dt class="text-slate-500">Domain</dt>
+                            <dd class="font-medium">
+                                @if ($name = $project->domain?->domain_name ?? $project->order?->primaryDomainName())
+                                    {{ $name }}
+                                @else
+                                    <span class="text-amber-700">Waiting for domain</span>
+                                @endif
+                            </dd>
+                        </div>
                     </dl>
+                    @if ($hosting = $project->order?->hostingAccount)
+                        <p class="mt-2 text-sm text-slate-500">Hosting: <span class="font-medium text-slate-700">{{ $hosting->status->customerLabel() }}</span></p>
+                    @endif
                     @if ($action = $project->status->customerNextAction())
                         <p class="mt-3 text-sm text-warning">{{ $action }}</p>
                     @endif

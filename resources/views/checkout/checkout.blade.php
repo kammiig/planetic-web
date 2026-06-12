@@ -123,12 +123,26 @@
                 </div>
             @else
                 {{-- ===================== AUTHENTICATED ===================== --}}
+                    @php
+                        // Step numbering shown to the customer (Account is always 1).
+                        $stepNo = [
+                            'domain' => 2,
+                            'review' => $needsDomain ? 3 : 2,
+                            'billing' => $needsDomain ? 4 : 3,
+                            'payment' => $needsDomain ? 5 : 4,
+                        ];
+                    @endphp
                     <div
                         x-data="checkout(@js([
                             'intentUrl' => route('checkout.payment-intent'),
                             'successUrl' => route('checkout.success'),
+                            'domainUrl' => route('checkout.domain'),
+                            'searchUrl' => route('domains.search'),
                             'publishableKey' => $publishableKey,
-                            'steps' => ['review', 'billing', 'payment'],
+                            'steps' => $needsDomain ? ['domain', 'review', 'billing', 'payment'] : ['review', 'billing', 'payment'],
+                            'domainChoice' => $domainChoice,
+                            'domainIsFree' => $domainIsFree,
+                            'initialStep' => $initialStep,
                         ]))"
                         x-cloak
                         class="mx-auto mt-10 grid max-w-5xl gap-6 lg:grid-cols-3"
@@ -153,14 +167,115 @@
                                 </div>
                             </div>
 
-                            {{-- Step 2: Confirm your plan --}}
+                            @if ($needsDomain)
+                                {{-- Step 2: Choose your domain (hosting / website package) --}}
+                                <div class="rounded-[14px] border bg-white shadow-soft transition"
+                                     x-bind:class="isActive('domain') ? 'border-primary-500' : 'border-slate-200'">
+                                    <button type="button" @click="goTo(steps.indexOf('domain'))" class="flex w-full items-center gap-3 px-5 py-4 text-left"
+                                            x-bind:class="isDone('domain') ? 'cursor-pointer' : 'cursor-default'">
+                                        <span class="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-sm font-bold"
+                                              x-bind:class="isActive('domain') ? 'bg-primary-500 text-white' : (isDone('domain') ? 'bg-success text-white' : 'bg-slate-100 text-slate-500')">
+                                            <span x-show="!isDone('domain')">{{ $stepNo['domain'] }}</span>
+                                            <svg x-show="isDone('domain')" x-cloak class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                                        </span>
+                                        <div class="flex-1">
+                                            <h2 data-step-heading class="text-base font-bold focus:outline-none">Choose your domain</h2>
+                                            <p class="text-sm text-slate-500" x-show="isDone('domain')" x-cloak>
+                                                <span x-show="domainMode === 'later'">You'll provide your domain later</span>
+                                                <span x-show="domainMode !== 'later'" x-text="domainQuery"></span>
+                                            </p>
+                                        </div>
+                                        <span x-show="isDone('domain')" x-cloak class="text-sm font-medium text-primary-600">Edit</span>
+                                    </button>
+
+                                    <div data-step="domain" x-show="isActive('domain')" x-cloak tabindex="-1" aria-label="Choose your domain" class="border-t border-slate-100 px-5 py-5 focus:outline-none">
+                                        <div class="alert alert-danger mb-4" role="alert" x-show="formError" x-text="formError" x-cloak></div>
+
+                                        @if ($domainIsFree)
+                                            <p class="mb-4 inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-sm font-semibold text-success">
+                                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                                                A new domain is FREE for the first year with your order
+                                            </p>
+                                        @endif
+
+                                        <div class="space-y-3" role="radiogroup" aria-label="Domain options">
+                                            {{-- Option 1: register a new domain --}}
+                                            <label class="flex cursor-pointer items-start gap-3 rounded-[12px] border p-4 transition"
+                                                   x-bind:class="domainMode === 'new' ? 'border-primary-500 bg-primary-50/40' : 'border-slate-200 hover:border-slate-300'">
+                                                <input type="radio" name="domain_mode" value="new" class="mt-1 h-5 w-5 border-slate-300 text-primary-500 focus:ring-primary-500"
+                                                       x-model="domainMode" @change="switchDomainMode('new')">
+                                                <span class="flex-1">
+                                                    <span class="block font-semibold text-slate-900">Register a new domain{{ $domainIsFree ? ' — free first year' : '' }}</span>
+                                                    <span class="mt-0.5 block text-sm text-slate-500">We'll register it for you and set everything up automatically.</span>
+
+                                                    <span class="mt-3 flex flex-col gap-2 sm:flex-row" x-show="domainMode === 'new'" x-cloak>
+                                                        <input type="text" x-model="domainQuery" @keydown.enter.prevent="checkDomain()"
+                                                               placeholder="yourbusiness.com" inputmode="url" autocomplete="off" spellcheck="false"
+                                                               class="input flex-1" aria-label="Domain to register"
+                                                               x-bind:class="fieldError('domain_name') && 'input-error'">
+                                                        <button type="button" @click="checkDomain()" class="btn-secondary whitespace-nowrap" x-bind:disabled="domainChecking">
+                                                            <span x-show="!domainChecking">Check availability</span>
+                                                            <span x-show="domainChecking" x-cloak>Checking…</span>
+                                                        </button>
+                                                    </span>
+                                                    <span class="mt-2 block text-sm font-medium" x-show="domainMode === 'new' && domainCheck" x-cloak
+                                                          x-bind:class="domainCheck && domainCheck.available ? 'text-success' : 'text-danger'"
+                                                          x-text="domainCheck && domainCheck.label" role="status"></span>
+                                                </span>
+                                            </label>
+
+                                            {{-- Option 2: bring an existing domain --}}
+                                            <label class="flex cursor-pointer items-start gap-3 rounded-[12px] border p-4 transition"
+                                                   x-bind:class="domainMode === 'existing' ? 'border-primary-500 bg-primary-50/40' : 'border-slate-200 hover:border-slate-300'">
+                                                <input type="radio" name="domain_mode" value="existing" class="mt-1 h-5 w-5 border-slate-300 text-primary-500 focus:ring-primary-500"
+                                                       x-model="domainMode" @change="switchDomainMode('existing')">
+                                                <span class="flex-1">
+                                                    <span class="block font-semibold text-slate-900">Use a domain I already own</span>
+                                                    <span class="mt-0.5 block text-sm text-slate-500">Keep it registered where it is — we'll connect your services to it and show you the DNS settings.</span>
+                                                    <span class="mt-3 block" x-show="domainMode === 'existing'" x-cloak>
+                                                        <input type="text" x-model="domainQuery"
+                                                               placeholder="yourdomain.co.uk" inputmode="url" autocomplete="off" spellcheck="false"
+                                                               class="input w-full" aria-label="Your existing domain"
+                                                               x-bind:class="fieldError('domain_name') && 'input-error'">
+                                                    </span>
+                                                </span>
+                                            </label>
+
+                                            @if ($canDeferDomain)
+                                                {{-- Option 3: decide later (website package only) --}}
+                                                <label class="flex cursor-pointer items-start gap-3 rounded-[12px] border p-4 transition"
+                                                       x-bind:class="domainMode === 'later' ? 'border-primary-500 bg-primary-50/40' : 'border-slate-200 hover:border-slate-300'">
+                                                    <input type="radio" name="domain_mode" value="later" class="mt-1 h-5 w-5 border-slate-300 text-primary-500 focus:ring-primary-500"
+                                                           x-model="domainMode" @change="switchDomainMode('later')">
+                                                    <span class="flex-1">
+                                                        <span class="block font-semibold text-slate-900">I'll decide my domain later</span>
+                                                        <span class="mt-0.5 block text-sm text-slate-500">Your website project starts now; we'll ask for your domain from your dashboard before anything goes live.</span>
+                                                    </span>
+                                                </label>
+                                            @endif
+                                        </div>
+
+                                        <p class="field-error mt-3" role="alert" x-show="fieldError('domain_name')" x-text="fieldError('domain_name')" x-cloak></p>
+                                        <p class="field-error mt-1" role="alert" x-show="fieldError('domain_source')" x-text="fieldError('domain_source')" x-cloak></p>
+
+                                        <div class="mt-5 flex items-center justify-end">
+                                            <button type="button" @click="continueDomain()" class="btn-primary" x-bind:disabled="domainSaving">
+                                                <span x-show="!domainSaving">Continue</span>
+                                                <span x-show="domainSaving" x-cloak>Saving…</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
+                            {{-- Confirm your plan --}}
                             <div class="rounded-[14px] border bg-white shadow-soft transition"
                                  x-bind:class="isActive('review') ? 'border-primary-500' : 'border-slate-200'">
-                                <button type="button" @click="goTo(0)" class="flex w-full items-center gap-3 px-5 py-4 text-left"
+                                <button type="button" @click="goTo(steps.indexOf('review'))" class="flex w-full items-center gap-3 px-5 py-4 text-left"
                                         x-bind:class="isDone('review') ? 'cursor-pointer' : 'cursor-default'">
                                     <span class="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-sm font-bold"
                                           x-bind:class="isActive('review') ? 'bg-primary-500 text-white' : (isDone('review') ? 'bg-success text-white' : 'bg-slate-100 text-slate-500')">
-                                        <span x-show="!isDone('review')">2</span>
+                                        <span x-show="!isDone('review')">{{ $stepNo['review'] }}</span>
                                         <svg x-show="isDone('review')" x-cloak class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
                                     </span>
                                     <h2 data-step-heading class="flex-1 text-base font-bold focus:outline-none">Confirm your plan</h2>
@@ -192,11 +307,11 @@
                             {{-- Step 3: Billing address --}}
                             <div class="rounded-[14px] border bg-white shadow-soft transition"
                                  x-bind:class="isActive('billing') ? 'border-primary-500' : 'border-slate-200'">
-                                <button type="button" @click="goTo(1)" class="flex w-full items-center gap-3 px-5 py-4 text-left"
+                                <button type="button" @click="goTo(steps.indexOf('billing'))" class="flex w-full items-center gap-3 px-5 py-4 text-left"
                                         x-bind:class="isDone('billing') ? 'cursor-pointer' : 'cursor-default'">
                                     <span class="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-sm font-bold"
                                           x-bind:class="isActive('billing') ? 'bg-primary-500 text-white' : (isDone('billing') ? 'bg-success text-white' : 'bg-slate-100 text-slate-500')">
-                                        <span x-show="!isDone('billing')">3</span>
+                                        <span x-show="!isDone('billing')">{{ $stepNo['billing'] }}</span>
                                         <svg x-show="isDone('billing')" x-cloak class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
                                     </span>
                                     <h2 data-step-heading class="flex-1 text-base font-bold focus:outline-none">Enter your billing address</h2>
@@ -251,7 +366,7 @@
                                  x-bind:class="isActive('payment') ? 'border-primary-500' : 'border-slate-200'">
                                 <div class="flex w-full items-center gap-3 px-5 py-4 text-left">
                                     <span class="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-sm font-bold"
-                                          x-bind:class="isActive('payment') ? 'bg-primary-500 text-white' : 'bg-slate-100 text-slate-500'">4</span>
+                                          x-bind:class="isActive('payment') ? 'bg-primary-500 text-white' : 'bg-slate-100 text-slate-500'">{{ $stepNo['payment'] }}</span>
                                     <h2 data-step-heading class="flex-1 text-base font-bold focus:outline-none">Choose a payment method</h2>
                                 </div>
 

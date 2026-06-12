@@ -2,12 +2,14 @@
 
 namespace App\Services\Cart;
 
+use App\Actions\Domains\CheckDomainAvailability;
 use App\Enums\ItemType;
 use App\Enums\ProductType;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Product;
 use App\Support\DomainName;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
@@ -137,9 +139,10 @@ class CartService
             throw ValidationException::withMessages(['product_id' => 'That hosting plan is not available.']);
         }
 
-        $cycle = in_array($data['billing_cycle'] ?? 'monthly', ['monthly', 'yearly'], true)
-            ? $data['billing_cycle']
-            : 'monthly';
+        $cycle = $data['billing_cycle'] ?? 'monthly';
+        if (! in_array($cycle, ['monthly', 'yearly'], true)) {
+            $cycle = 'monthly';
+        }
 
         $price = $product->priceFor($cycle);
 
@@ -160,6 +163,229 @@ class CartService
         $price = $product?->priceFor('yearly');
 
         return [$product, $price, 'Domain registration: '.$domainName, (float) ($price?->amount ?? 12.99), 'yearly'];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Domain choice (hosting & website package orders)
+    |--------------------------------------------------------------------------
+    | WHM cannot create a cPanel account without a domain, so any order that
+    | includes hosting must carry one before payment. The checkout collects the
+    | customer's choice — register a new domain, use one they already own, or
+    | (website package only) provide it later — and stores it on the cart
+    | items, from where it flows onto the order items and provisioning.
+    */
+
+    /** Cart items that need a domain attached before provisioning can run. */
+    public function itemsNeedingDomain(Cart $cart): Collection
+    {
+        return $cart->items->filter(fn (CartItem $i) => in_array(
+            $i->item_type, [ItemType::WebsitePackage, ItemType::Hosting], true
+        ));
+    }
+
+    public function needsDomainChoice(Cart $cart): bool
+    {
+        return $this->itemsNeedingDomain($cart)->isNotEmpty();
+    }
+
+    /**
+     * "Decide later" is only allowed for the website package — our team picks
+     * the project up manually anyway. A standalone hosting plan must have a
+     * domain before payment (business rule).
+     */
+    public function canDeferDomain(Cart $cart): bool
+    {
+        return $cart->items->contains('item_type', ItemType::WebsitePackage)
+            && ! $cart->items->contains('item_type', ItemType::Hosting);
+    }
+
+    /** The first year of the domain is free with the website package or a flagged hosting plan. */
+    public function domainIsFree(Cart $cart): bool
+    {
+        if ($cart->items->contains('item_type', ItemType::WebsitePackage)) {
+            return true;
+        }
+
+        return $cart->items
+            ->filter(fn (CartItem $i) => $i->item_type === ItemType::Hosting)
+            ->contains(fn (CartItem $i) => (bool) $i->product?->hostingPackage?->includes_free_domain);
+    }
+
+    /**
+     * The current domain choice: explicit (stored on hosting/website items),
+     * derived from a domain-registration line already in the cart, or none.
+     *
+     * @return array{source: ?string, domain: ?string}
+     */
+    public function domainChoice(Cart $cart): array
+    {
+        $carrier = $this->itemsNeedingDomain($cart)
+            ->first(fn (CartItem $i) => filled($i->metadata['domain_source'] ?? null));
+
+        if ($carrier) {
+            return [
+                'source' => $carrier->metadata['domain_source'],
+                'domain' => $carrier->domain_name,
+            ];
+        }
+
+        $domainLine = $cart->items->firstWhere('item_type', ItemType::DomainRegistration);
+
+        if ($domainLine && filled($domainLine->domain_name)) {
+            return ['source' => 'new', 'domain' => $domainLine->domain_name];
+        }
+
+        return ['source' => null, 'domain' => null];
+    }
+
+    /**
+     * Whether checkout may proceed to payment. Returns a customer-facing error
+     * when the order includes hosting but no usable domain choice was made.
+     */
+    public function domainRequirementError(Cart $cart): ?string
+    {
+        if (! $this->needsDomainChoice($cart)) {
+            return null;
+        }
+
+        $choice = $this->domainChoice($cart);
+
+        if ($choice['source'] === 'later') {
+            return $this->canDeferDomain($cart)
+                ? null
+                : 'Hosting needs a domain — please choose or enter one before paying.';
+        }
+
+        if (filled($choice['domain'])) {
+            return null;
+        }
+
+        return 'Please choose a domain for your order before paying — register a new one or use a domain you already own.';
+    }
+
+    /**
+     * Persist the customer's domain choice onto the cart.
+     *
+     * @param  string  $source  new | existing | later
+     */
+    public function setDomainChoice(string $source, ?string $domainName = null): Cart
+    {
+        $cart = $this->currentCart()->load('items.product.hostingPackage');
+
+        if (! $this->needsDomainChoice($cart)) {
+            throw ValidationException::withMessages([
+                'domain_source' => 'This order does not need a domain.',
+            ]);
+        }
+
+        if ($source === 'later') {
+            if (! $this->canDeferDomain($cart)) {
+                throw ValidationException::withMessages([
+                    'domain_source' => 'Hosting requires a domain — you can register a new one or use a domain you already own.',
+                ]);
+            }
+
+            $this->applyDomainToItems($cart, null, 'later');
+            $this->removeAutoAddedDomainLine($cart);
+
+            return $cart->load('items')->recalculate();
+        }
+
+        $domain = DomainName::normalise((string) $domainName);
+
+        if (! DomainName::isValid($domain)) {
+            throw ValidationException::withMessages([
+                'domain_name' => 'Please enter a valid domain name, e.g. yourbusiness.com.',
+            ]);
+        }
+
+        if ($source === 'new') {
+            $availability = app(CheckDomainAvailability::class)->handle($domain);
+
+            if (! ($availability['available'] ?? false)) {
+                throw ValidationException::withMessages([
+                    'domain_name' => $domain.' is not available to register. Try another name, or choose "Use a domain I already own".',
+                ]);
+            }
+
+            $this->applyDomainToItems($cart, $domain, 'new');
+            $this->ensureDomainLine($cart, $domain);
+        } else {
+            // A domain the customer already owns (registered elsewhere) — we
+            // never charge for or try to register it.
+            $this->applyDomainToItems($cart, $domain, 'existing');
+            $this->removeAutoAddedDomainLine($cart);
+        }
+
+        return $cart->load('items')->recalculate();
+    }
+
+    private function applyDomainToItems(Cart $cart, ?string $domain, string $source): void
+    {
+        foreach ($this->itemsNeedingDomain($cart) as $item) {
+            $name = $item->item_type === ItemType::WebsitePackage
+                ? 'Complete Bespoke Website'.($domain ? ' (with '.$domain.')' : '')
+                : $item->name;
+
+            $item->update([
+                'domain_name' => $domain,
+                'name' => $name,
+                'metadata' => array_merge($item->metadata ?? [], ['domain_source' => $source]),
+            ]);
+        }
+    }
+
+    /**
+     * Make sure a domain-registration line exists for a newly registered
+     * domain — free (£0) when included with the website package or a flagged
+     * hosting plan, otherwise priced from the catalogue.
+     */
+    private function ensureDomainLine(Cart $cart, string $domain): void
+    {
+        $free = $this->domainIsFree($cart);
+        $existing = $cart->items->firstWhere('item_type', ItemType::DomainRegistration);
+
+        [$product, $price, , $unitPrice] = $this->domainPricing($domain);
+        $unitPrice = $free ? 0.0 : $unitPrice;
+        $name = 'Domain registration: '.$domain.($free ? ' (free first year)' : '');
+
+        if ($existing) {
+            $existing->update([
+                'domain_name' => $domain,
+                'name' => $name,
+                'unit_price' => $unitPrice,
+                'total' => $unitPrice,
+                'metadata' => array_merge($existing->metadata ?? [], [
+                    'billing_cycle' => 'yearly',
+                    'auto_added' => $existing->metadata['auto_added'] ?? true,
+                    'free_first_year' => $free,
+                ]),
+            ]);
+
+            return;
+        }
+
+        $cart->items()->create([
+            'product_id' => $product?->id,
+            'product_price_id' => $price?->id,
+            'item_type' => ItemType::DomainRegistration->value,
+            'name' => $name,
+            'domain_name' => $domain,
+            'quantity' => 1,
+            'unit_price' => $unitPrice,
+            'total' => $unitPrice,
+            'metadata' => ['billing_cycle' => 'yearly', 'auto_added' => true, 'free_first_year' => $free],
+        ]);
+    }
+
+    /** Remove a domain line we added automatically (never one the customer added). */
+    private function removeAutoAddedDomainLine(Cart $cart): void
+    {
+        $cart->items
+            ->filter(fn (CartItem $i) => $i->item_type === ItemType::DomainRegistration
+                && ($i->metadata['auto_added'] ?? false))
+            ->each->delete();
     }
 
     private function guardDuplicates(Cart $cart, ItemType $type, ?string $domainName): void

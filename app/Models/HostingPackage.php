@@ -11,7 +11,7 @@ class HostingPackage extends Model
     protected $fillable = [
         'product_id', 'name', 'whm_package_name', 'disk_limit_mb',
         'bandwidth_limit_mb', 'email_accounts_limit', 'database_limit',
-        'domain_limit', 'is_active',
+        'domain_limit', 'includes_free_domain', 'is_active',
     ];
 
     protected function casts(): array
@@ -22,6 +22,7 @@ class HostingPackage extends Model
             'email_accounts_limit' => 'integer',
             'database_limit' => 'integer',
             'domain_limit' => 'integer',
+            'includes_free_domain' => 'boolean',
             'is_active' => 'boolean',
         ];
     }

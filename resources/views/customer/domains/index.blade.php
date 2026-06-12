@@ -22,6 +22,7 @@
                         <th scope="col">Registered</th>
                         <th scope="col">Expiry</th>
                         <th scope="col">Price</th>
+                        <th scope="col">Cloudflare</th>
                         <th scope="col"><span class="sr-only">Actions</span></th>
                     </tr>
                 </thead>
@@ -32,7 +33,12 @@
                             $isWebsiteBundle = $item && $item->item_type === \App\Enums\ItemType::WebsitePackage;
                         @endphp
                         <tr>
-                            <td class="font-semibold text-slate-900">{{ $domain->domain_name }}</td>
+                            <td class="font-semibold text-slate-900">
+                                {{ $domain->domain_name }}
+                                @if ($domain->registrar === 'external')
+                                    <span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">External</span>
+                                @endif
+                            </td>
                             <td>
                                 <x-status-badge :status="$domain->status" />
                                 @if (in_array($domain->status, [\App\Enums\DomainStatus::Failed, \App\Enums\DomainStatus::ManualReview, \App\Enums\DomainStatus::RegistrationPending], true))
@@ -49,6 +55,13 @@
                                     £{{ number_format((float) $item->unit_price, 2) }}
                                 @else
                                     —
+                                @endif
+                            </td>
+                            <td>
+                                @if ($domain->registrar === 'external')
+                                    <span class="text-xs text-slate-500">Your registrar</span>
+                                @else
+                                    {{ $domain->cloudflareZone?->status?->label() ?? '—' }}
                                 @endif
                             </td>
                             <td class="text-right">

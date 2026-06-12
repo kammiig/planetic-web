@@ -31,14 +31,33 @@ class RegistrarResponseParser
 
         if ($code !== self::NAMESILO_SUCCESS) {
             $detail = $reply['detail'] ?? 'unknown error';
+            $hint = $this->nameSiloCodeHint($code);
+
             throw new RegistrarException(
-                "NameSilo {$operation} failed (code {$code}): {$detail}",
+                "NameSilo {$operation} failed (code {$code}): {$detail}".($hint ? " — {$hint}" : ''),
                 registrar: 'namesilo',
                 context: $reply,
             );
         }
 
         return $reply;
+    }
+
+    /**
+     * Plain-English admin guidance for the NameSilo failure codes we actually
+     * see in practice. Shown in the provisioning monitor and admin alert
+     * emails — never to customers.
+     */
+    private function nameSiloCodeHint(int $code): ?string
+    {
+        return match ($code) {
+            110 => 'Check NAMESILO_API_KEY in the server .env — NameSilo says the key is invalid.',
+            112 => 'The API key belongs to a NameSilo sub-account that cannot use this operation.',
+            113 => 'This NameSilo API endpoint is disabled for the account — check API settings at namesilo.com.',
+            119 => 'The NameSilo account balance is too low to pay for this registration. Top up funds at namesilo.com -> Account Funds, then retry the step.',
+            261, 262 => 'The domain is no longer available to register — agree a different domain with the customer, update the order, and retry.',
+            default => null,
+        };
     }
 
     /**

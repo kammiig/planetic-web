@@ -6,6 +6,20 @@
 @section('content')
     <p class="text-slate-600">Welcome back, {{ auth()->user()->name }}. Here's an overview of your services.</p>
 
+    {{-- Action required: a paid order is waiting for the customer's domain --}}
+    @if ($awaitingDomain)
+        <div class="alert alert-warning mt-4 flex flex-wrap items-center justify-between gap-3">
+            <span>
+                <strong>Action needed:</strong> your services for order
+                {{ $awaitingDomain->order?->order_number }} are paid and waiting — tell us your domain to finish setup.
+            </span>
+            <a href="{{ $awaitingDomain->order?->websiteProject
+                    ? route('customer.projects.show', $awaitingDomain->order->websiteProject)
+                    : route('customer.hosting.show', $awaitingDomain) }}"
+               class="btn-primary btn-sm whitespace-nowrap">Choose my domain</a>
+        </div>
+    @endif
+
     {{-- In-progress / manual review notices --}}
     @foreach ($inProgressOrders as $order)
         <div class="alert {{ $order->status === \App\Enums\OrderStatus::ManualReview ? 'alert-info' : 'alert-warning' }} mt-4">

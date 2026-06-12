@@ -97,9 +97,19 @@ class OrdersProvisionCommand extends Command
             $this->error("  Could not ensure service records: {$e->getMessage()}");
         }
 
-        $reset = $this->resetStalledSteps($order);
-        if ($reset > 0) {
-            $this->line("  Reset {$reset} failed/stalled step(s) to pending.");
+        // Legacy repair: a paid hosting order with no domain can never be
+        // provisioned — don't retry it blindly. Park the hosting visibly in
+        // "Awaiting domain", clear the impossible steps, and let the dashboard
+        // prompt + email ask the customer for their domain.
+        if ($this->parkIfAwaitingDomain($order->fresh('items'))) {
+            $this->warn('  No domain on this order — hosting parked as "Awaiting domain".');
+            $this->warn('  The customer is prompted on their dashboard (and by email) to provide one;');
+            $this->warn('  provisioning resumes automatically the moment they do.');
+        } else {
+            $reset = $this->resetStalledSteps($order);
+            if ($reset > 0) {
+                $this->line("  Reset {$reset} failed/stalled step(s) to pending.");
+            }
         }
 
         try {
@@ -109,6 +119,44 @@ class OrdersProvisionCommand extends Command
         }
 
         $this->report($order->fresh());
+    }
+
+    /**
+     * For paid hosting orders without a domain: flip failed/manual-review
+     * hosting records to Awaiting Domain, remove step rows that cannot run
+     * without a domain (they'd otherwise halt the chain forever), and bring
+     * the order itself out of manual review. Returns true when handled.
+     */
+    private function parkIfAwaitingDomain(Order $order): bool
+    {
+        if (! $order->needsHosting() || filled($order->domainChoice()['domain'])) {
+            return false;
+        }
+
+        $hosting = $order->hostingAccount()->first();
+        if ($hosting && blank($hosting->domain_name) && in_array($hosting->status, [
+            \App\Enums\HostingStatus::Failed,
+            \App\Enums\HostingStatus::ManualReview,
+            \App\Enums\HostingStatus::Pending,
+        ], true)) {
+            $hosting->update(['status' => \App\Enums\HostingStatus::AwaitingDomain->value]);
+        }
+
+        // These steps are no longer scheduled for domain-less orders; stale
+        // failed/pending rows from before the fix would halt the chain.
+        $order->provisioningJobs()
+            ->whereIn('job_type', [
+                'register_domain', 'create_cloudflare_zone', 'update_nameservers',
+                'create_hosting_account', 'create_dns_records',
+            ])
+            ->where('status', '!=', ProvisioningStatus::Completed->value)
+            ->delete();
+
+        if ($order->status === OrderStatus::ManualReview) {
+            $order->forceFill(['status' => OrderStatus::Provisioning->value])->save();
+        }
+
+        return true;
     }
 
     /** Reset failed / manual-review / stuck-running steps so the chain re-runs them. */

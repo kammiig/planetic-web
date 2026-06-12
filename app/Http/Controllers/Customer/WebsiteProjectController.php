@@ -18,7 +18,7 @@ class WebsiteProjectController extends Controller
     public function index(Request $request): View
     {
         return view('customer.projects.index', [
-            'projects' => $request->user()->websiteProjects()->with(['order', 'domain'])->latest()->get(),
+            'projects' => $request->user()->websiteProjects()->with(['order.items', 'order.hostingAccount', 'domain'])->latest()->get(),
         ]);
     }
 
@@ -26,7 +26,7 @@ class WebsiteProjectController extends Controller
     {
         abort_unless($project->isOwnedBy($request->user()), 404);
 
-        $project->load('assets', 'domain', 'hostingAccount');
+        $project->load('assets', 'domain', 'hostingAccount', 'order.items', 'order.hostingAccount');
 
         return view('customer.projects.show', ['project' => $project]);
     }

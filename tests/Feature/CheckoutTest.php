@@ -65,6 +65,9 @@ class CheckoutTest extends TestCase
 
         $user = $this->createUser();
         $this->actingAs($user)->postJson('/cart/items', ['item_type' => 'website_package'])->assertOk();
+        // The domain step is mandatory for hosting/website orders ("later" is
+        // allowed for the website package and keeps services visibly waiting).
+        $this->actingAs($user)->postJson('/checkout/domain', ['domain_source' => 'later'])->assertOk();
 
         $response = $this->actingAs($user)->postJson('/checkout/payment-intent', $this->billingPayload());
 
@@ -110,6 +113,7 @@ class CheckoutTest extends TestCase
 
         $user = $this->createUser();
         $this->actingAs($user)->postJson('/cart/items', ['item_type' => 'website_package']);
+        $this->actingAs($user)->postJson('/checkout/domain', ['domain_source' => 'later'])->assertOk();
         $this->actingAs($user)->postJson('/checkout/payment-intent', $this->billingPayload(['billing_city' => 'Manchester']));
 
         $this->assertSame('Manchester', $user->fresh()->billing_city);

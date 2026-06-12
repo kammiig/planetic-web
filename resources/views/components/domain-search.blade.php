@@ -5,6 +5,37 @@
 
 @php $dark = $variant === 'hero'; @endphp
 
+@if ($variant === 'hero')
+    {{-- Hero: a plain GET form that lands on the dedicated results page
+         (/domains?q=…), which auto-searches and shows the exact match plus
+         alternatives and the domain + website bundle. --}}
+    <div class="w-full">
+        <form method="GET" action="{{ route('domains.index') }}" class="flex flex-col gap-3 sm:flex-row" role="search" aria-label="Domain availability search">
+            <div class="flex-1">
+                <label for="domain-q-hero" class="sr-only">Domain name</label>
+                <input
+                    id="domain-q-hero"
+                    type="text"
+                    name="q"
+                    value="{{ request('q', '') }}"
+                    @if ($autofocus) autofocus @endif
+                    inputmode="url"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="yourbusiness.co.uk"
+                    class="input border-transparent shadow-large"
+                    aria-describedby="domain-q-help-hero"
+                >
+                <p id="domain-q-help-hero" class="mt-2 text-sm text-slate-300">
+                    Search for your business domain. Renewal applies after the first year.
+                </p>
+            </div>
+            <div>
+                <button type="submit" class="btn-primary w-full sm:w-auto">Search Domain</button>
+            </div>
+        </form>
+    </div>
+@else
 <div
     x-data="{
         query: @js(request('q', '')),
@@ -144,3 +175,4 @@
         </template>
     </div>
 </div>
+@endif

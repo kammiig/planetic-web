@@ -26,7 +26,7 @@ class CheckoutController extends Controller
      */
     public function index(Request $request): View|RedirectResponse
     {
-        $cart = $this->cart->currentCart()->load('items');
+        $cart = $this->cart->currentCart()->load('items.product.hostingPackage');
         $pendingOrder = $this->pendingCheckoutOrder($request);
 
         if ($cart->items->isEmpty() && ! $pendingOrder) {
@@ -37,12 +37,40 @@ class CheckoutController extends Controller
         // refresh mid-payment, once the cart has already been converted).
         $usingOrder = $cart->items->isEmpty() && $pendingOrder;
 
+        // Hosting / website-package orders must pick a domain before paying.
+        // (When resuming a converted order the choice is already baked in.)
+        $needsDomain = ! $usingOrder && $this->cart->needsDomainChoice($cart);
+
         return view('checkout.checkout', [
             'lineItems' => $usingOrder ? $pendingOrder->items : $cart->items,
             'total' => $usingOrder ? (float) $pendingOrder->total : (float) $cart->total,
             'freeYearNotice' => config('billing.website_package.free_year_notice'),
             'publishableKey' => (string) config('stripe.public_key'),
+            'needsDomain' => $needsDomain,
+            'domainChoice' => $needsDomain ? $this->cart->domainChoice($cart) : ['source' => null, 'domain' => null],
+            'canDeferDomain' => $needsDomain && $this->cart->canDeferDomain($cart),
+            'domainIsFree' => $needsDomain && $this->cart->domainIsFree($cart),
+            'initialStep' => (string) $request->query('step', ''),
         ]);
+    }
+
+    /**
+     * AJAX: store the customer's domain choice (register new / use existing /
+     * decide later) on the cart. Validation failures return 422 JSON; the
+     * availability of a "new" domain is verified server-side.
+     */
+    public function setDomain(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'domain_source' => ['required', 'in:new,existing,later'],
+            'domain_name' => ['required_unless:domain_source,later', 'nullable', 'string', 'max:253'],
+        ], [
+            'domain_name.required_unless' => 'Please enter a domain name.',
+        ]);
+
+        $this->cart->setDomainChoice($validated['domain_source'], $validated['domain_name'] ?? null);
+
+        return response()->json(['ok' => true]);
     }
 
     /**
@@ -52,6 +80,14 @@ class CheckoutController extends Controller
      */
     public function paymentIntent(CheckoutRequest $request, CreateOrderFromCart $createOrder, StripeService $stripe): JsonResponse
     {
+        // Hosting cannot be provisioned without a domain — enforce the domain
+        // choice server-side before any money is taken.
+        $cart = $this->cart->currentCart()->load('items.product.hostingPackage');
+
+        if ($cart->items->isNotEmpty() && ($error = $this->cart->domainRequirementError($cart))) {
+            return response()->json(['error' => $error], 422);
+        }
+
         // Persist billing details to the customer's profile.
         $request->user()->update($request->billingData());
 

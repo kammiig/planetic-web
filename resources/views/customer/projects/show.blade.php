@@ -22,7 +22,38 @@
         @if ($action = $project->status->customerNextAction())
             <div class="alert alert-info mt-4">{{ $action }}</div>
         @endif
+
+        <dl class="mt-4 grid gap-4 text-sm sm:grid-cols-3">
+            <div>
+                <dt class="text-slate-500">Domain</dt>
+                <dd class="font-medium">{{ $project->domain?->domain_name ?? $project->order?->primaryDomainName() ?? 'Waiting for your domain' }}</dd>
+            </div>
+            <div>
+                <dt class="text-slate-500">Hosting</dt>
+                <dd class="font-medium">
+                    @if ($hosting = $project->order?->hostingAccount)
+                        {{ $hosting->status->customerLabel() }}
+                    @else
+                        Included — set up after your domain
+                    @endif
+                </dd>
+            </div>
+            <div>
+                <dt class="text-slate-500">Order</dt>
+                <dd class="font-medium">{{ $project->order?->order_number ?? '—' }}</dd>
+            </div>
+        </dl>
     </div>
+
+    @php
+        $orderNeedsDomain = $project->order
+            && $project->order->isPaid()
+            && blank($project->order->primaryDomainName())
+            && ! $project->domain;
+    @endphp
+    @if ($orderNeedsDomain)
+        @include('customer.partials.add-domain-form', ['order' => $project->order])
+    @endif
 
     @if ($needsIntake)
         {{-- Intake form --}}

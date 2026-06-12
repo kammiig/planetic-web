@@ -177,6 +177,13 @@ The public hosting plans map to WHM packages in the `hosting_packages` table (se
 `planetic_starter`, `planetic_business`, `planetic_pro`, `planetic_agency`). Create matching packages in
 WHM, or edit the mapping in the admin panel (Super Admin).
 
+**Domains at checkout:** any order containing hosting must carry a domain before payment —
+checkout collects it (register new / use an existing domain). The website package may defer
+("decide later"): hosting then sits visibly in **Awaiting domain** and the customer is prompted
+on the dashboard + by email; provisioning resumes automatically once they provide it.
+Tick **Includes free first-year domain** on a hosting package (admin → Hosting Packages) to offer
+a free new-domain registration with that plan; the website package always includes one.
+
 ### 7. Provisioning & troubleshooting
 
 If an order is stuck (payment taken but services not showing), use the built-in commands:

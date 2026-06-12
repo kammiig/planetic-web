@@ -43,8 +43,13 @@ class CreateWhmHostingAccountJob extends ProvisioningStepJob
             ?? $order->domain()->value('domain_name')
             ?? $this->existingDomainName($order);
 
+        // Defence in depth — this step is no longer scheduled for orders
+        // without a domain, but if it ever runs anyway the hosting stays
+        // visible in "Awaiting domain" instead of becoming a fake failure.
         if (blank($domainName)) {
-            throw new ProvisioningException('Hosting requires a domain name.');
+            $account?->update(['status' => HostingStatus::AwaitingDomain->value]);
+
+            return ['skipped' => true, 'reason' => 'awaiting_domain'];
         }
 
         $package = $account?->hostingPackage ?? $this->resolvePackage($order);

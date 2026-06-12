@@ -61,6 +61,12 @@ Route::prefix('cart')->name('cart.')->group(function () {
 Route::prefix('checkout')->name('checkout.')->group(function () {
     Route::get('/', [CheckoutController::class, 'index'])->name('index');
 
+    // Domain choice for hosting / website-package orders: register new, use
+    // an existing domain, or (website package only) decide later.
+    Route::post('/domain', [CheckoutController::class, 'setDomain'])
+        ->middleware(['auth', 'throttle:20,1'])
+        ->name('domain');
+
     // On-site payment: creates/reuses the order + Stripe PaymentIntent and
     // returns its client_secret. Requires a signed-in customer only.
     Route::post('/payment-intent', [CheckoutController::class, 'paymentIntent'])

@@ -12,7 +12,7 @@ class DomainController extends Controller
     public function index(Request $request): View
     {
         return view('customer.domains.index', [
-            'domains' => $request->user()->domains()->with('order.items')->latest()->paginate(15),
+            'domains' => $request->user()->domains()->with('order.items', 'cloudflareZone')->latest()->paginate(15),
         ]);
     }
 

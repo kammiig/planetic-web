@@ -57,35 +57,52 @@ class ProvisionOrderJob implements ShouldQueue
     }
 
     /**
+     * Build the step list from what the order actually needs and the
+     * customer's domain choice. Steps that cannot succeed are never scheduled,
+     * so a predictable gap (e.g. "domain to be provided later") can never
+     * surface as a fake failure or manual review.
+     *
      * @return array<int, ProvisioningJobType>
      */
     private function stepsFor(Order $order): array
     {
-        $needsDomain = $order->items->contains(
-            fn ($i) => in_array($i->item_type, [ItemType::WebsitePackage, ItemType::DomainRegistration], true) && filled($i->domain_name)
-        );
-        $needsHosting = $order->items->contains(
-            fn ($i) => in_array($i->item_type, [ItemType::WebsitePackage, ItemType::Hosting], true)
-        );
+        $choice = $order->domainChoice();
+        $hasDomain = filled($choice['domain']);
+
+        // 'existing' = the customer already owns the domain at another
+        // registrar: we never register it or touch its nameservers, but we DO
+        // create the Cloudflare zone + records and the cPanel account for it.
+        $registerViaUs = $hasDomain && $choice['source'] !== 'existing';
+
+        $needsHosting = $order->needsHosting();
 
         // We only manage a Cloudflare zone / DNS when the order also includes
         // hosting (a bundle or the website package) — there is a server to point
         // the records at. A domain-only registration is just registered, so it
         // never gets stuck waiting on DNS that has nowhere to resolve.
-        $manageDns = $needsDomain && $needsHosting;
+        $manageDns = $hasDomain && $needsHosting;
 
         $steps = [];
 
-        if ($needsDomain) {
+        if ($registerViaUs) {
             $steps[] = ProvisioningJobType::RegisterDomain;
         }
 
         if ($manageDns) {
             $steps[] = ProvisioningJobType::CreateCloudflareZone;
-            $steps[] = ProvisioningJobType::UpdateNameservers;
+
+            // Nameservers can only be switched automatically at OUR registrar;
+            // for an external domain the customer points them (shown in the
+            // dashboard with the Cloudflare nameservers to use).
+            if ($registerViaUs) {
+                $steps[] = ProvisioningJobType::UpdateNameservers;
+            }
         }
 
-        if ($needsHosting) {
+        // WHM cannot create an account without a domain. With "decide later"
+        // the visible hosting record stays in Awaiting Domain until the
+        // customer provides one — no step is scheduled, nothing can fail.
+        if ($needsHosting && $hasDomain) {
             $steps[] = ProvisioningJobType::CreateHostingAccount;
         }
 

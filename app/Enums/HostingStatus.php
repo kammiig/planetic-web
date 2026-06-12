@@ -8,6 +8,7 @@ enum HostingStatus: string implements \Filament\Support\Contracts\HasColor, \Fil
 
     case Pending = 'pending';
     case Creating = 'creating';
+    case AwaitingDomain = 'awaiting_domain';
     case Active = 'active';
     case Suspended = 'suspended';
     case Terminated = 'terminated';
@@ -19,6 +20,7 @@ enum HostingStatus: string implements \Filament\Support\Contracts\HasColor, \Fil
         return match ($this) {
             self::Pending => 'Pending',
             self::Creating => 'Creating',
+            self::AwaitingDomain => 'Awaiting Domain',
             self::Active => 'Active',
             self::Suspended => 'Suspended',
             self::Terminated => 'Terminated',
@@ -31,7 +33,7 @@ enum HostingStatus: string implements \Filament\Support\Contracts\HasColor, \Fil
     {
         return match ($this) {
             self::Active => 'badge-success',
-            self::Pending, self::Creating => 'badge-warning',
+            self::Pending, self::Creating, self::AwaitingDomain => 'badge-warning',
             self::Suspended, self::Failed, self::Terminated => 'badge-danger',
             self::ManualReview => 'badge-info',
         };
@@ -41,6 +43,7 @@ enum HostingStatus: string implements \Filament\Support\Contracts\HasColor, \Fil
     {
         return match ($this) {
             self::Pending, self::Creating => 'Creating hosting account',
+            self::AwaitingDomain => 'Waiting for your domain details',
             self::Failed, self::ManualReview => 'Being reviewed by our team',
             default => $this->label(),
         };

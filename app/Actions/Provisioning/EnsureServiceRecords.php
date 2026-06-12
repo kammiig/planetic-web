@@ -43,7 +43,8 @@ class EnsureServiceRecords
 
     private function ensureDomain(Order $order): void
     {
-        $domainName = $this->domainNameFor($order);
+        $choice = $order->domainChoice();
+        $domainName = $choice['domain'];
 
         if (blank($domainName) || $order->domain()->exists()) {
             return;
@@ -62,23 +63,29 @@ class EnsureServiceRecords
 
         $parsed = DomainName::parse($domainName);
 
+        // A domain the customer already owns elsewhere is recorded as external:
+        // visible in the Domains tab, used by hosting/Cloudflare, but never
+        // registered or renewed by us.
+        $external = $choice['source'] === 'existing';
+
         Domain::create([
             'user_id' => $order->user_id,
             'order_id' => $order->id,
             'domain_name' => $domainName,
             'sld' => $parsed->sld,
             'tld' => $parsed->tld,
-            'registrar' => config('domain.default_registrar'),
-            'status' => DomainStatus::RegistrationPending->value,
-            'registration_date' => now()->toDateString(),
-            'auto_renew' => config('domain.defaults.auto_renew', true),
-            'whois_privacy' => config('domain.defaults.whois_privacy', true),
-            'registrar_lock' => config('domain.defaults.registrar_lock', true),
+            'registrar' => $external ? 'external' : config('domain.default_registrar'),
+            'status' => $external ? DomainStatus::Active->value : DomainStatus::RegistrationPending->value,
+            'registration_date' => $external ? null : now()->toDateString(),
+            'auto_renew' => ! $external && config('domain.defaults.auto_renew', true),
+            'whois_privacy' => ! $external && config('domain.defaults.whois_privacy', true),
+            'registrar_lock' => ! $external && config('domain.defaults.registrar_lock', true),
         ]);
 
-        Log::channel('stack')->info('Provisioning: pending domain record created', [
+        Log::channel('stack')->info('Provisioning: domain record created', [
             'order' => $order->order_number,
             'domain' => $domainName,
+            'source' => $choice['source'],
         ]);
     }
 
@@ -91,18 +98,18 @@ class EnsureServiceRecords
         $domainName = $this->hostingDomainName($order);
         $package = $this->resolveHostingPackage($order);
 
-        // hosting_accounts.hosting_package_id is NOT NULL and whm_username is
-        // unique+required, so we need both up front. If either is missing the
-        // skeleton is skipped (logged) — the WHM step will surface the problem.
-        if (blank($domainName) || ! $package) {
-            Log::channel('stack')->warning('Provisioning: could not create pending hosting record (missing domain or package).', [
+        if (! $package) {
+            Log::channel('stack')->warning('Provisioning: could not create pending hosting record (no hosting package resolved).', [
                 'order' => $order->order_number,
-                'has_domain' => filled($domainName),
-                'has_package' => (bool) $package,
             ]);
 
             return;
         }
+
+        // No domain yet ("decide later") → the record is still created and
+        // visible, parked in Awaiting Domain. The username is generated when
+        // the customer provides the domain.
+        $awaiting = blank($domainName);
 
         HostingAccount::create([
             'user_id' => $order->user_id,
@@ -110,17 +117,17 @@ class EnsureServiceRecords
             'domain_id' => $order->domain()->value('id'),
             'hosting_package_id' => $package->id,
             'domain_name' => $domainName,
-            'whm_username' => $this->packageMapper->generateUsername($domainName),
+            'whm_username' => $awaiting ? null : $this->packageMapper->generateUsername($domainName),
             'server_hostname' => config('whm.server_hostname'),
-            'status' => HostingStatus::Pending->value,
+            'status' => $awaiting ? HostingStatus::AwaitingDomain->value : HostingStatus::Pending->value,
             'disk_limit_mb' => $package->disk_limit_mb,
             'bandwidth_limit_mb' => $package->bandwidth_limit_mb,
             'renewal_date' => now()->addYear()->toDateString(),
         ]);
 
-        Log::channel('stack')->info('Provisioning: pending hosting record created', [
+        Log::channel('stack')->info('Provisioning: hosting record created', [
             'order' => $order->order_number,
-            'domain' => $domainName,
+            'domain' => $domainName ?? '(awaiting domain)',
             'package' => $package->whm_package_name,
         ]);
     }

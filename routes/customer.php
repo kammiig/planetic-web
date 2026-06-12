@@ -37,6 +37,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('invoices/{invoice}', [BillingController::class, 'showInvoice'])->name('invoices.show');
         Route::get('invoices/{invoice}/download', [BillingController::class, 'downloadInvoice'])->name('invoices.download');
 
+        // Late domain choice ("I'll decide later" orders)
+        Route::post('orders/{order}/domain', [\App\Http\Controllers\Customer\OrderDomainController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('orders.domain');
+
         // Website projects
         Route::get('website-projects', [WebsiteProjectController::class, 'index'])->name('projects.index');
         Route::get('website-projects/{project}', [WebsiteProjectController::class, 'show'])->name('projects.show');

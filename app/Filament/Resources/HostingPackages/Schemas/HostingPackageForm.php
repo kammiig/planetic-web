@@ -31,6 +31,9 @@ class HostingPackageForm
                     ->numeric(),
                 TextInput::make('domain_limit')
                     ->numeric(),
+                Toggle::make('includes_free_domain')
+                    ->label('Includes free first-year domain')
+                    ->helperText('Checkout offers a free new-domain registration with this plan.'),
                 Toggle::make('is_active')
                     ->required(),
             ]);

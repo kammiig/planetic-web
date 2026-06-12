@@ -23,6 +23,8 @@ Alpine.data('checkout', (config = {}) => ({
     step: 0,
     intentUrl: config.intentUrl,
     successUrl: config.successUrl,
+    domainUrl: config.domainUrl || '',
+    searchUrl: config.searchUrl || '',
     publishableKey: config.publishableKey || '',
     stripe: null,
     elements: null,
@@ -33,6 +35,23 @@ Alpine.data('checkout', (config = {}) => ({
     paymentReady: false,
     formError: '',
     fieldErrors: {},
+
+    // Domain step (hosting / website-package orders)
+    domainMode: (config.domainChoice && config.domainChoice.source) || 'new',
+    domainQuery: (config.domainChoice && config.domainChoice.domain) || '',
+    domainFree: !!config.domainIsFree,
+    domainCheck: null, // {available: bool, label: string}
+    domainChecking: false,
+    domainSaving: false,
+
+    init() {
+        // Land on a specific step after a reload (e.g. returning from the
+        // domain step once the choice is saved and the summary re-rendered).
+        const wanted = this.steps.indexOf(config.initialStep);
+        if (wanted > 0) {
+            this.step = wanted;
+        }
+    },
 
     get currentStep() {
         return this.steps[this.step];
@@ -92,6 +111,88 @@ Alpine.data('checkout', (config = {}) => ({
     csrfToken() {
         const meta = document.querySelector('meta[name="csrf-token"]');
         return meta ? meta.getAttribute('content') : '';
+    },
+
+    switchDomainMode(mode) {
+        this.domainMode = mode;
+        this.domainCheck = null;
+        this.formError = '';
+        this.fieldErrors = {};
+    },
+
+    /** Optional assist: live availability check for the "register new" option. */
+    async checkDomain() {
+        const domain = (this.domainQuery || '').trim().toLowerCase();
+        if (!domain) {
+            this.fieldErrors = { domain_name: ['Please enter a domain name to check.'] };
+            return;
+        }
+
+        this.domainChecking = true;
+        this.domainCheck = null;
+        this.fieldErrors = {};
+        try {
+            const res = await fetch(this.searchUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': this.csrfToken() },
+                body: JSON.stringify({ domain }),
+            });
+            const data = await res.json();
+            if (!res.ok || data.success === false) {
+                this.domainCheck = { available: false, label: data.message || 'We could not check this domain right now.' };
+            } else if (data.available) {
+                this.domainCheck = {
+                    available: true,
+                    label: data.domain + ' is available' + (this.domainFree ? ' — FREE for the first year' : (data.price ? ' — £' + data.price + '/year' : '')),
+                };
+            } else {
+                this.domainCheck = { available: false, label: data.domain + ' is taken. Try another name, or use "I already own a domain".' };
+            }
+        } catch (e) {
+            this.domainCheck = { available: false, label: 'We could not check this domain right now. Please try again.' };
+        } finally {
+            this.domainChecking = false;
+        }
+    },
+
+    /** Save the domain choice server-side, then reload onto the plan step. */
+    async continueDomain() {
+        this.formError = '';
+        this.fieldErrors = {};
+        this.domainSaving = true;
+
+        const body = new FormData();
+        body.append('domain_source', this.domainMode);
+        body.append('domain_name', this.domainMode === 'later' ? '' : (this.domainQuery || '').trim().toLowerCase());
+
+        try {
+            const res = await fetch(this.domainUrl, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
+                body,
+            });
+
+            if (res.status === 422) {
+                const data = await res.json();
+                this.fieldErrors = data.errors || {};
+                this.formError = data.message || 'Please check your domain choice and try again.';
+                return;
+            }
+            if (!res.ok) {
+                this.formError = 'Something went wrong saving your domain. Please try again.';
+                return;
+            }
+
+            // Reload so the order summary reflects the choice (e.g. the free
+            // first-year domain line), landing directly on the next step.
+            const url = new URL(window.location.href);
+            url.searchParams.set('step', 'review');
+            window.location.assign(url.toString());
+        } catch (e) {
+            this.formError = 'Network error — please check your connection and try again.';
+        } finally {
+            this.domainSaving = false;
+        }
     },
 
     /** Billing → Payment: validate server-side, create the intent, mount the element. */

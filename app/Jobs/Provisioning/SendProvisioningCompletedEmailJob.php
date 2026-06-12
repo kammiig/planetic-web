@@ -2,7 +2,9 @@
 
 namespace App\Jobs\Provisioning;
 
+use App\Enums\HostingStatus;
 use App\Enums\ProvisioningJobType;
+use App\Mail\DomainNeededMail;
 use App\Mail\ProvisioningCompletedMail;
 use App\Models\Order;
 use App\Models\ProvisioningJob;
@@ -22,16 +24,22 @@ class SendProvisioningCompletedEmailJob extends ProvisioningStepJob
 
     protected function perform(Order $order, ProvisioningJob $step): array
     {
-        $log = app(NotificationService::class)->send(
-            $order->user,
-            new ProvisioningCompletedMail(
-                $order,
-                $order->domain()->first(),
-                $order->hostingAccount()->first(),
-            ),
-            'provisioning_completed',
-        );
+        $hosting = $order->hostingAccount()->first();
 
-        return ['notification_log_id' => $log->id, 'status' => $log->status];
+        // "Decide my domain later" orders get an action-required email instead
+        // of "your services are ready" — the ready email follows once the
+        // domain is provided and provisioning has actually run.
+        $awaitingDomain = ($hosting && $hosting->status === HostingStatus::AwaitingDomain)
+            || ($order->needsHosting() && blank($order->domainChoice()['domain']));
+
+        $log = $awaitingDomain
+            ? app(NotificationService::class)->send($order->user, new DomainNeededMail($order), 'domain_needed')
+            : app(NotificationService::class)->send(
+                $order->user,
+                new ProvisioningCompletedMail($order, $order->domain()->first(), $hosting),
+                'provisioning_completed',
+            );
+
+        return ['notification_log_id' => $log->id, 'status' => $log->status, 'variant' => $awaitingDomain ? 'domain_needed' : 'completed'];
     }
 }

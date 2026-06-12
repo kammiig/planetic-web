@@ -40,7 +40,26 @@ class OrdersDebugCommand extends Command
             ['Stripe checkout session', $order->stripe_checkout_session_id ?? '—'],
             ['Invoice', $order->invoice?->invoice_number ?? '—'],
             ['Payments recorded', (string) $order->payments->count()],
-            ['Items', $order->items->map(fn ($i) => $i->item_type->value.($i->domain_name ? " ({$i->domain_name})" : ''))->implode(', ')],
+            ['Items', $order->items->map(function ($i) {
+                $bits = $i->item_type->value;
+                if ($i->domain_name) {
+                    $bits .= " ({$i->domain_name})";
+                }
+                if ($source = $i->metadata['domain_source'] ?? null) {
+                    $bits .= " [domain: {$source}]";
+                }
+
+                return $bits;
+            })->implode(', ')],
+            ['Domain choice', (function () use ($order) {
+                $choice = $order->domainChoice();
+
+                if (blank($choice['domain']) && blank($choice['source'])) {
+                    return $order->needsHosting() ? 'MISSING — hosting waits for the customer\'s domain' : '—';
+                }
+
+                return trim(($choice['domain'] ?? '(none yet)').' · source: '.($choice['source'] ?? 'unknown'));
+            })()],
         ]);
 
         // Provisioning ledger.
@@ -70,6 +89,17 @@ class OrdersDebugCommand extends Command
             ['Hosting', $order->hostingAccount ? 'yes' : 'no', $order->hostingAccount?->status->value ?? '—', $order->hostingAccount?->whm_username ?? '—'],
             ['Website project', $order->websiteProject ? 'yes' : 'no', $order->websiteProject?->status->value ?? '—', $order->websiteProject?->project_number ?? '—'],
         ]);
+
+        // Latest registrar / Cloudflare / WHM responses (admin debugging).
+        $withResponses = $order->provisioningJobs->filter(fn ($j) => filled($j->response_payload));
+        if ($withResponses->isNotEmpty()) {
+            $this->line('');
+            $this->components->info('Latest step responses');
+            foreach ($withResponses as $job) {
+                $payload = json_encode($job->response_payload, JSON_UNESCAPED_SLASHES);
+                $this->line("  <comment>{$job->job_type->value}</comment>: ".Str::limit((string) $payload, 220));
+            }
+        }
 
         // Last error across the ledger.
         $lastError = $order->provisioningJobs

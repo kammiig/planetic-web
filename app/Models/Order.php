@@ -86,4 +86,38 @@ class Order extends Model
     {
         return $this->items->firstWhere(fn (OrderItem $i) => filled($i->domain_name))?->domain_name;
     }
+
+    public function needsHosting(): bool
+    {
+        return $this->items->contains(
+            fn (OrderItem $i) => in_array($i->item_type, [ItemType::WebsitePackage, ItemType::Hosting], true)
+        );
+    }
+
+    /**
+     * The customer's domain decision for this order, as captured at checkout:
+     * 'new' (register via us), 'existing' (they already own it — never
+     * registered or charged by us), or 'later' (website package only).
+     * Falls back to deriving 'new' from any domain-carrying line for legacy
+     * orders placed before domain choice existed.
+     *
+     * @return array{source: ?string, domain: ?string}
+     */
+    public function domainChoice(): array
+    {
+        $this->loadMissing('items');
+
+        $carrier = $this->items->first(fn (OrderItem $i) => filled($i->metadata['domain_source'] ?? null));
+
+        if ($carrier) {
+            return [
+                'source' => $carrier->metadata['domain_source'],
+                'domain' => $carrier->domain_name ?: $this->primaryDomainName(),
+            ];
+        }
+
+        $domain = $this->primaryDomainName();
+
+        return ['source' => $domain ? 'new' : null, 'domain' => $domain];
+    }
 }

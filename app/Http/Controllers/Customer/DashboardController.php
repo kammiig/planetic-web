@@ -36,7 +36,16 @@ class DashboardController extends Controller
             HostingStatus::ManualReview->value,
         ];
 
+        // Paid services parked on "decide my domain later" — surfaced as an
+        // action banner so the customer knows exactly what to do next.
+        $awaitingDomain = $user->hostingAccounts()
+            ->with('order.websiteProject')
+            ->where('status', HostingStatus::AwaitingDomain->value)
+            ->latest()
+            ->first();
+
         return view('customer.dashboard', [
+            'awaitingDomain' => $awaitingDomain,
             'domainsCount' => $user->domains()->where('status', DomainStatus::Active->value)->count(),
             'pendingDomainsCount' => $user->domains()->whereIn('status', $pendingDomainStatuses)->count(),
             'hostingCount' => $user->hostingAccounts()->where('status', HostingStatus::Active->value)->count(),
