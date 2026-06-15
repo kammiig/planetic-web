@@ -25,7 +25,7 @@
                         <div class="flex justify-between"><dt class="text-slate-500">Plan</dt><dd class="font-medium">{{ $account->hostingPackage?->name ?? '—' }}</dd></div>
                         <div class="flex justify-between"><dt class="text-slate-500">Username</dt><dd class="font-mono font-medium">{{ $account->whm_username ?? '—' }}</dd></div>
                         <div class="flex justify-between"><dt class="text-slate-500">Server</dt><dd class="font-medium">{{ $account->server_hostname ?? 'Assigning…' }}</dd></div>
-                        <div class="flex justify-between"><dt class="text-slate-500">Cloudflare DNS</dt><dd class="font-medium">{{ $account->domain?->cloudflareZone?->status?->label() ?? '—' }}</dd></div>
+                        <div class="flex justify-between"><dt class="text-slate-500">Cloudflare DNS</dt><dd class="font-medium">{{ $account->domain?->cloudflareZone?->dnsStatusLabel() ?? '—' }}</dd></div>
                         <div class="flex justify-between"><dt class="text-slate-500">Order</dt><dd class="font-medium">{{ $account->order?->order_number ?? '—' }}</dd></div>
                         <div class="flex justify-between"><dt class="text-slate-500">Renewal</dt><dd class="font-medium">{{ $account->renewal_date?->format('j M Y') ?? '—' }}</dd></div>
                     </dl>

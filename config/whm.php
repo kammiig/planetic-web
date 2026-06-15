@@ -43,6 +43,10 @@ return [
 
     'username_prefix' => env('WHM_USERNAME_PREFIX', 'pw'),
 
-    'request_timeout' => (int) env('WHM_REQUEST_TIMEOUT', 30),
+    // WHM createacct can legitimately take 30-90s on a busy server. A short
+    // timeout produces cURL 28 errors even when the account is created, so the
+    // default is generous; provisioning also reconciles via listaccts on a
+    // transport error before deciding anything failed.
+    'request_timeout' => (int) env('WHM_REQUEST_TIMEOUT', 120),
 
 ];

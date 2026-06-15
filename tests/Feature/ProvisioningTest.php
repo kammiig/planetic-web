@@ -133,8 +133,10 @@ class ProvisioningTest extends TestCase
         // Cloudflare zone + DNS records created.
         $this->assertDatabaseHas('cloudflare_zones', ['zone_id' => 'zone_abc123', 'domain_id' => $domain->id]);
         $this->assertDatabaseHas('dns_records', ['domain_id' => $domain->id, 'type' => 'A', 'name' => '@', 'proxied' => true]);
-        $this->assertDatabaseHas('dns_records', ['domain_id' => $domain->id, 'name' => 'mail', 'proxied' => false]);
-        $this->assertDatabaseHas('dns_records', ['domain_id' => $domain->id, 'type' => 'MX', 'proxied' => false]);
+        $this->assertDatabaseHas('dns_records', ['domain_id' => $domain->id, 'type' => 'A', 'name' => 'www', 'proxied' => true]);
+        // The 3 platform mail exchangers — always DNS-only so email is delivered.
+        $this->assertSame(3, \App\Models\DnsRecord::where('domain_id', $domain->id)->where('type', 'MX')->where('proxied', false)->count());
+        $this->assertDatabaseHas('dns_records', ['domain_id' => $domain->id, 'type' => 'MX', 'content' => 'mx1-hosting.jellyfish.systems', 'priority' => 5]);
 
         // Hosting account created.
         $this->assertDatabaseHas('hosting_accounts', [
@@ -163,8 +165,8 @@ class ProvisioningTest extends TestCase
         $this->assertSame(1, \App\Models\Domain::where('domain_name', 'example.com')->count());
         $this->assertSame(1, \App\Models\CloudflareZone::where('domain_id', $order->domain->id)->count());
         $this->assertSame(1, \App\Models\HostingAccount::where('order_id', $order->id)->count());
-        // 8 default DNS records, created exactly once.
-        $this->assertSame(8, \App\Models\DnsRecord::where('domain_id', $order->domain->id)->count());
+        // 9 default DNS records (A @/www/mail/webmail + 3 MX + SPF + DMARC), created exactly once.
+        $this->assertSame(9, \App\Models\DnsRecord::where('domain_id', $order->domain->id)->count());
     }
 
     public function test_domain_registration_failure_routes_to_manual_review(): void

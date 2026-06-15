@@ -61,7 +61,7 @@
                                 @if ($domain->registrar === 'external')
                                     <span class="text-xs text-slate-500">Your registrar</span>
                                 @else
-                                    {{ $domain->cloudflareZone?->status?->label() ?? '—' }}
+                                    {{ $domain->cloudflareZone?->dnsStatusLabel() ?? '—' }}
                                 @endif
                             </td>
                             <td class="text-right">

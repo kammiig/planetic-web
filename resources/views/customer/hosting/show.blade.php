@@ -25,7 +25,8 @@
         <dl class="mt-6 grid gap-4 sm:grid-cols-2">
             <div><dt class="text-sm text-slate-500">Plan</dt><dd class="font-medium">{{ $account->hostingPackage?->name ?? '—' }}</dd></div>
             <div><dt class="text-sm text-slate-500">Username</dt><dd class="font-mono font-medium">{{ $account->whm_username ?? 'Assigned with your domain' }}</dd></div>
-            <div><dt class="text-sm text-slate-500">Cloudflare DNS</dt><dd class="font-medium">{{ $account->domain?->cloudflareZone?->status?->label() ?? '—' }}</dd></div>
+            <div><dt class="text-sm text-slate-500">Cloudflare DNS</dt><dd class="font-medium">{{ $account->domain?->cloudflareZone?->dnsStatusLabel() ?? '—' }}</dd></div>
+            <div><dt class="text-sm text-slate-500">SSL</dt><dd class="font-medium">{{ $account->domain?->cloudflareZone?->sslStatusLabel() ?? '—' }}</dd></div>
             <div><dt class="text-sm text-slate-500">Server IP</dt><dd class="font-mono font-medium">{{ $account->server_ip ?? '—' }}</dd></div>
             <div><dt class="text-sm text-slate-500">Renewal</dt><dd class="font-medium">{{ $account->renewal_date?->format('j M Y') ?? '—' }}</dd></div>
             @if ($account->disk_limit_mb)

@@ -173,9 +173,23 @@ Subscribe to: `checkout.session.completed`, `payment_intent.succeeded`,
 
 ### 6. WHM package names
 
-The public hosting plans map to WHM packages in the `hosting_packages` table (seeded as
-`planetic_starter`, `planetic_business`, `planetic_pro`, `planetic_agency`). Create matching packages in
-WHM, or edit the mapping in the admin panel (Super Admin).
+The public hosting plans map to WHM packages in the `hosting_packages` table (seeded to match the
+live reseller account: `kwashqap_starter`, `kwashqap_Business`, `kwashqap_Pro`,
+`kwashqap_Agency Ecommerce`). The exact `whm_package_name` is sent to WHM's `createacct`, so it must
+match a package that exists in WHM — create them there, or edit the mapping in the admin panel
+(Super Admin → Hosting Packages).
+
+**WHM reliability:** `createacct` is POSTed (the cPanel password never appears in a URL/log/email) with
+a 120s timeout (`WHM_REQUEST_TIMEOUT`). On a transport timeout, provisioning queries `listaccts` for the
+domain before deciding anything — if the account exists it is adopted as active (no duplicate, no false
+failure). Set `WHM_SERVER_IP` (e.g. `185.61.154.32`) so DNS records can point at the server.
+
+**DNS & SSL:** after the Cloudflare zone is created (and BEFORE the cPanel account, so a slow WHM step
+can't block DNS), the default record set is created idempotently — A `@`/`www`/`mail`/`webmail` → server
+IP (proxied), MX → `cloudflare.mx_hosts` (DEFAULT_MX_HOSTS, priorities DEFAULT_MX_PRIORITIES `5,10,20`,
+DNS-only), plus SPF/DMARC. The zone is set to SSL **Full** + Always Use HTTPS. Until the domain's
+nameservers point at Cloudflare the dashboard shows **"Waiting for nameserver verification"** for DNS/SSL,
+never a failed state.
 
 **Domains at checkout:** any order containing hosting must carry a domain before payment —
 checkout collects it (register new / use an existing domain). The website package may defer

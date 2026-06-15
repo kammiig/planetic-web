@@ -156,7 +156,7 @@ class ProvisioningRecoveryTest extends TestCase
         $this->assertDatabaseHas('hosting_accounts', ['order_id' => $order->id, 'status' => 'active', 'server_ip' => '203.0.113.10']);
         $this->assertDatabaseHas('website_projects', ['order_id' => $order->id]);
         $this->assertDatabaseHas('cloudflare_zones', ['zone_id' => 'zone_abc123']);
-        $this->assertSame(8, \App\Models\DnsRecord::count());
+        $this->assertSame(9, \App\Models\DnsRecord::count()); // A @,www,mail,webmail + 3 MX + SPF + DMARC
     }
 
     public function test_hosting_failure_keeps_a_visible_failed_record(): void
@@ -205,7 +205,7 @@ class ProvisioningRecoveryTest extends TestCase
         $this->assertSame(1, Domain::where('order_id', $order->id)->count());
         $this->assertSame(1, HostingAccount::where('order_id', $order->id)->count());
         $this->assertSame(1, WebsiteProject::where('order_id', $order->id)->count());
-        $this->assertSame(8, \App\Models\DnsRecord::count());
+        $this->assertSame(9, \App\Models\DnsRecord::count()); // A @,www,mail,webmail + 3 MX + SPF + DMARC
     }
 
     public function test_domain_only_order_skips_hosting_and_cloudflare(): void

@@ -3,8 +3,10 @@
 namespace App\Services\Hosting;
 
 use App\Exceptions\WhmException;
+use App\Support\Secrets;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -30,24 +32,88 @@ class WhmService
             'password' => $data['password'],
         ], config('hosting.account_defaults', []));
 
-        $response = $this->request('createacct', $params, 'create account', allowFailure: true);
+        try {
+            // Sent as a POST body so the password never appears in the request
+            // URL (and therefore never in a transport error message or log).
+            $response = $this->request('createacct', $params, 'create account', allowFailure: true);
+        } catch (WhmException $e) {
+            // A timeout (cURL 28) does NOT mean failure — WHM may have created
+            // the account anyway. Reconcile against the live account list
+            // before deciding, so we never duplicate or wrongly fail.
+            if ($existing = $this->findAccountByDomain($data['domain'])) {
+                Log::channel('stack')->warning('WHM createacct transport error, but the account exists — adopting it.', [
+                    'domain' => $data['domain'],
+                    'username' => $existing['user'] ?? $data['username'],
+                ]);
+
+                return $this->accountResult($existing, $data['plan']);
+            }
+
+            throw $e;
+        }
+
         $meta = $response['metadata'] ?? [];
 
         if ((int) ($meta['result'] ?? 0) !== 1) {
             $reason = (string) ($meta['reason'] ?? 'unknown error');
-            // "Account already exists" / domain collisions carry duplicate
-            // risk and must go to manual review, never blind retry.
-            $duplicate = str_contains(strtolower($reason), 'already exists');
-            throw new WhmException("WHM createacct failed: {$reason}", manualReview: $duplicate, context: $meta);
+
+            // The account may already exist from a previous (timed-out) attempt.
+            if (str_contains(strtolower($reason), 'already exists')) {
+                if ($existing = $this->findAccountByDomain($data['domain'])) {
+                    return $this->accountResult($existing, $data['plan']);
+                }
+
+                // Exists but we cannot read it back — needs a human, never retry.
+                throw new WhmException('WHM createacct: '.Secrets::redact($reason), manualReview: true, context: $this->safeContext($meta));
+            }
+
+            throw new WhmException('WHM createacct failed: '.Secrets::redact($reason), context: $this->safeContext($meta));
         }
 
-        $accountData = $response['data'] ?? [];
+        return $this->accountResult($response['data'] ?? [], $data['plan']);
+    }
 
+    /**
+     * Look up a cPanel account by its primary domain. Used to reconcile after a
+     * timeout and to make creation idempotent on retry.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findAccountByDomain(string $domain): ?array
+    {
+        $domain = strtolower($domain);
+
+        try {
+            // WHM supports server-side search; fall back to scanning the list.
+            $response = $this->request('listaccts', ['search' => $domain, 'searchtype' => 'domain'], 'list accounts');
+        } catch (Throwable $e) {
+            Log::channel('stack')->warning('WHM account lookup failed.', ['error' => Secrets::redact($e->getMessage())]);
+
+            return null;
+        }
+
+        $accounts = $response['data']['acct'] ?? $response['acct'] ?? [];
+
+        foreach ($accounts as $account) {
+            if (strtolower((string) ($account['domain'] ?? '')) === $domain) {
+                return $account;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $account
+     * @return array{success: bool, ip: ?string, nameserver: ?string, package: ?string}
+     */
+    private function accountResult(array $account, string $fallbackPlan): array
+    {
         return [
             'success' => true,
-            'ip' => $accountData['ip'] ?? null,
-            'nameserver' => $accountData['nameserver'] ?? null,
-            'package' => $accountData['package'] ?? $data['plan'],
+            'ip' => $account['ip'] ?? null,
+            'nameserver' => $account['nameserver'] ?? ($account['nameservers'][0] ?? null),
+            'package' => $account['package'] ?? $account['plan'] ?? $fallbackPlan,
         ];
     }
 
@@ -106,10 +172,14 @@ class WhmService
         $url = sprintf('https://%s:%s/json-api/%s', $config['host'], $config['port'], $function);
 
         try {
+            // POST form body: secrets (the cPanel password) travel in the body,
+            // never the URL, so a transport error message can't leak them.
             $response = $this->httpClient($config)
-                ->get($url, array_merge(['api.version' => 1], $params));
+                ->asForm()
+                ->post($url, array_merge(['api.version' => 1], $params));
         } catch (Throwable $e) {
-            throw new WhmException("WHM {$label} request error: {$e->getMessage()}", previous: $e);
+            // Defence in depth: redact in case any client still surfaces a URL.
+            throw new WhmException('WHM '.$label.' request error: '.Secrets::redact($e->getMessage()), previous: $e);
         }
 
         if ($response->failed()) {
@@ -124,11 +194,22 @@ class WhmService
         return $json;
     }
 
+    /**
+     * Strip any sensitive keys from a context array before it is stored.
+     *
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function safeContext(array $context): array
+    {
+        return Secrets::redactArray($context);
+    }
+
     private function httpClient(array $config): PendingRequest
     {
         $client = Http::withHeaders([
             'Authorization' => 'whm '.$config['username'].':'.$config['token'],
-        ])->timeout((int) ($config['request_timeout'] ?? 30));
+        ])->timeout((int) ($config['request_timeout'] ?? 120));
 
         if (! ($config['verify_ssl'] ?? true)) {
             $client = $client->withoutVerifying();

@@ -39,4 +39,33 @@ class CloudflareZone extends Model
     {
         return $this->hasMany(DnsRecord::class);
     }
+
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    /** Customer-facing DNS status. */
+    public function dnsStatusLabel(): string
+    {
+        return $this->isActive()
+            ? 'Active'
+            : 'Waiting for nameserver verification';
+    }
+
+    /**
+     * Customer-facing SSL status. Cloudflare cannot issue the edge certificate
+     * until the domain's nameservers point at Cloudflare, so an unverified zone
+     * shows "waiting" rather than a scary failed state.
+     */
+    public function sslStatusLabel(): string
+    {
+        if (! $this->isActive()) {
+            return 'Waiting for nameserver verification';
+        }
+
+        $mode = ucfirst((string) ($this->ssl_mode ?: 'full'));
+
+        return "Active ({$mode})";
+    }
 }

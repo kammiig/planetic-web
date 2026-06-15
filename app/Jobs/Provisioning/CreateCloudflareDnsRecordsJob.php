@@ -30,27 +30,39 @@ class CreateCloudflareDnsRecordsJob extends ProvisioningStepJob
             throw new ProvisioningException('Cannot create DNS records before the Cloudflare zone exists.');
         }
 
+        $dryRun = (bool) config('provisioning.dry_run', false);
         $serverIp = $order->hostingAccount()->value('server_ip') ?: config('whm.server_ip');
 
         if (blank($serverIp)) {
-            throw new ProvisioningException('No server IP available for DNS records.');
+            // In dry-run there may be no real server IP configured; records are
+            // only simulated, so a placeholder is fine. In live mode a missing
+            // WHM_SERVER_IP is a genuine config error worth surfacing.
+            if ($dryRun) {
+                $serverIp = '127.0.0.1';
+            } else {
+                throw new ProvisioningException('No server IP available for DNS records — set WHM_SERVER_IP.');
+            }
         }
 
         $zone = $domain->cloudflareZone;
         $cloudflare = app(CloudflareService::class);
         $records = app(DefaultDnsRecordBuilder::class)->build($domain->domain_name, $serverIp);
+        $dryRun = (bool) config('provisioning.dry_run', false);
 
         $created = 0;
-        foreach ($records as $record) {
-            // Skip records we have already created (idempotent on retry).
-            $exists = $zone->dnsRecords()
+        $updated = 0;
+        foreach ($records as $i => $record) {
+            // Match an existing local record. MX/TXT can repeat on the same
+            // name, so they are keyed by content too (3 MX all live on '@').
+            $query = $zone->dnsRecords()
                 ->where('type', $record['type'])
-                ->where('name', $record['name'])
-                ->exists();
+                ->where('name', $record['name']);
 
-            if ($exists) {
-                continue;
+            if (in_array($record['type'], ['MX', 'TXT'], true)) {
+                $query->where('content', $record['content']);
             }
+
+            $local = $query->first();
 
             $payload = [
                 'type' => $record['type'],
@@ -63,59 +75,74 @@ class CreateCloudflareDnsRecordsJob extends ProvisioningStepJob
                 $payload['priority'] = $record['priority'];
             }
 
-            // Safe test mode: persist the record locally without calling Cloudflare.
-            if (config('provisioning.dry_run', false)) {
-                $domain->dnsRecords()->create([
-                    'user_id' => $order->user_id,
-                    'cloudflare_zone_id' => $zone->id,
-                    'cloudflare_record_id' => 'dry-run-'.$record['type'].'-'.$created,
-                    'type' => $record['type'],
-                    'name' => $record['name'],
-                    'content' => $record['content'],
-                    'ttl' => $record['ttl'],
-                    'proxied' => $record['proxied'],
-                    'priority' => $record['priority'] ?? null,
-                    'status' => 'active',
-                ]);
-                $created++;
+            // Safe test mode: persist locally without calling Cloudflare.
+            if ($dryRun) {
+                $domain->dnsRecords()->updateOrCreate(
+                    ['type' => $record['type'], 'name' => $record['name'], 'content' => $record['content']],
+                    [
+                        'user_id' => $order->user_id,
+                        'cloudflare_zone_id' => $zone->id,
+                        'cloudflare_record_id' => 'dry-run-'.$record['type'].'-'.$i,
+                        'ttl' => $record['ttl'],
+                        'proxied' => $record['proxied'],
+                        'priority' => $record['priority'] ?? null,
+                        'status' => 'active',
+                    ],
+                );
+                $local ? $updated++ : $created++;
 
                 continue;
             }
 
             try {
+                if ($local && filled($local->cloudflare_record_id)) {
+                    // Already in Cloudflare → update it (keeps content/proxy in sync).
+                    $cloudflare->updateDnsRecord($zone->zone_id, $local->cloudflare_record_id, $payload);
+                    $local->update([
+                        'content' => $record['content'],
+                        'ttl' => $record['ttl'],
+                        'proxied' => $record['proxied'],
+                        'priority' => $record['priority'] ?? null,
+                        'status' => 'active',
+                    ]);
+                    $updated++;
+
+                    continue;
+                }
+
                 $cfRecord = $cloudflare->createDnsRecord($zone->zone_id, $payload);
             } catch (CloudflareException $e) {
                 // One bad record shouldn't abort the rest; record it and move on.
-                $domain->dnsRecords()->create([
-                    'user_id' => $order->user_id,
-                    'cloudflare_zone_id' => $zone->id,
-                    'type' => $record['type'],
-                    'name' => $record['name'],
-                    'content' => $record['content'],
-                    'ttl' => $record['ttl'],
-                    'proxied' => $record['proxied'],
-                    'priority' => $record['priority'] ?? null,
-                    'status' => 'failed',
-                ]);
+                $domain->dnsRecords()->updateOrCreate(
+                    ['type' => $record['type'], 'name' => $record['name'], 'content' => $record['content']],
+                    [
+                        'user_id' => $order->user_id,
+                        'cloudflare_zone_id' => $zone->id,
+                        'ttl' => $record['ttl'],
+                        'proxied' => $record['proxied'],
+                        'priority' => $record['priority'] ?? null,
+                        'status' => 'failed',
+                    ],
+                );
 
                 continue;
             }
 
-            $domain->dnsRecords()->create([
-                'user_id' => $order->user_id,
-                'cloudflare_zone_id' => $zone->id,
-                'cloudflare_record_id' => $cfRecord['id'],
-                'type' => $record['type'],
-                'name' => $record['name'],
-                'content' => $record['content'],
-                'ttl' => $record['ttl'],
-                'proxied' => $record['proxied'],
-                'priority' => $record['priority'] ?? null,
-                'status' => 'active',
-            ]);
+            $domain->dnsRecords()->updateOrCreate(
+                ['type' => $record['type'], 'name' => $record['name'], 'content' => $record['content']],
+                [
+                    'user_id' => $order->user_id,
+                    'cloudflare_zone_id' => $zone->id,
+                    'cloudflare_record_id' => $cfRecord['id'],
+                    'ttl' => $record['ttl'],
+                    'proxied' => $record['proxied'],
+                    'priority' => $record['priority'] ?? null,
+                    'status' => 'active',
+                ],
+            );
             $created++;
         }
 
-        return ['records_created' => $created];
+        return ['records_created' => $created, 'records_updated' => $updated];
     }
 }

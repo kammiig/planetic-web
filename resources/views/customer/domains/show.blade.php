@@ -22,13 +22,33 @@
                 <dt class="text-sm text-slate-500">DNS (Cloudflare)</dt>
                 <dd>
                     @if ($domain->cloudflareZone)
-                        <span class="badge badge-success"><span class="badge-dot"></span> {{ ucfirst($domain->cloudflareZone->status) }}</span>
+                        <span class="badge {{ $domain->cloudflareZone->isActive() ? 'badge-success' : 'badge-warning' }}"><span class="badge-dot"></span> {{ $domain->cloudflareZone->dnsStatusLabel() }}</span>
                     @else
                         <span class="badge badge-warning"><span class="badge-dot"></span> DNS activation pending</span>
                     @endif
                 </dd>
             </div>
+            <div>
+                <dt class="text-sm text-slate-500">SSL</dt>
+                <dd>
+                    @if ($domain->cloudflareZone)
+                        <span class="badge {{ $domain->cloudflareZone->isActive() ? 'badge-success' : 'badge-warning' }}"><span class="badge-dot"></span> {{ $domain->cloudflareZone->sslStatusLabel() }}</span>
+                    @else
+                        <span class="badge badge-warning"><span class="badge-dot"></span> Pending</span>
+                    @endif
+                </dd>
+            </div>
         </dl>
+
+        @if ($domain->cloudflareZone && ! $domain->cloudflareZone->isActive() && $domain->registrar === 'external' && $domain->nameservers)
+            <div class="alert alert-info mt-6">
+                <strong>Point your domain at Cloudflare to go live.</strong>
+                At your current registrar, set these nameservers — DNS and SSL activate automatically once they propagate:
+                <ul class="mt-2 space-y-1 font-mono text-sm">
+                    @foreach ($domain->nameservers as $ns)<li>{{ $ns }}</li>@endforeach
+                </ul>
+            </div>
+        @endif
 
         @if ($domain->nameservers)
             <div class="mt-6">

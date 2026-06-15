@@ -71,8 +71,25 @@ class CreateWhmHostingAccountJob extends ProvisioningStepJob
             return ['simulated' => true, 'username' => $username, 'package' => $plan];
         }
 
+        $whm = app(WhmService::class);
+
+        // Idempotent retry: if a previous attempt actually created the account
+        // on WHM (e.g. it timed out client-side), adopt it instead of trying to
+        // create a duplicate.
+        if ($existing = $whm->findAccountByDomain($domainName)) {
+            Log::channel('stack')->info('WHM account already present — adopting it.', [
+                'order' => $order->order_number,
+                'domain' => $domainName,
+            ]);
+
+            $serverIp = ($existing['ip'] ?? null) ?: config('whm.server_ip');
+            $this->persistActiveAccount($order, $account, $domainName, $existing['user'] ?? $username, $package, $serverIp);
+
+            return ['username' => $existing['user'] ?? $username, 'ip' => $serverIp, 'package' => $plan, 'adopted' => true];
+        }
+
         try {
-            $result = app(WhmService::class)->createAccount([
+            $result = $whm->createAccount([
                 'username' => $username,
                 'domain' => $domainName,
                 'contactemail' => $order->user->email,

@@ -45,6 +45,30 @@ return [
     'dmarc_policy' => env('DEFAULT_DMARC_POLICY', 'none'),
 
     /*
+    | Mail exchangers for the hosting platform. Each customer domain gets these
+    | MX records (DNS-only — never proxied) so inbound email is delivered to the
+    | mail cluster. Priorities are assigned 5, 10, 15… in list order. Override
+    | the host list via DEFAULT_MX_HOSTS (comma-separated) if it changes.
+    */
+    'mx_hosts' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('DEFAULT_MX_HOSTS', 'mx1-hosting.jellyfish.systems,mx2-hosting.jellyfish.systems,mx3-hosting.jellyfish.systems')),
+    ))),
+
+    // MX priorities, applied to mx_hosts in order. Defaults match the platform
+    // reference zone (5 / 10 / 20). Any host beyond this list falls back to
+    // an incrementing priority.
+    'mx_priorities' => array_values(array_filter(array_map(
+        fn ($p) => is_numeric(trim((string) $p)) ? (int) trim((string) $p) : null,
+        explode(',', (string) env('DEFAULT_MX_PRIORITIES', '5,10,20')),
+    ), fn ($v) => $v !== null)),
+
+    // Whether the mail/webmail A records are proxied through Cloudflare. The
+    // platform's reference zone proxies them; the MX targets above stay DNS-only
+    // regardless, so mail delivery is unaffected.
+    'proxy_mail_records' => filter_var(env('CLOUDFLARE_PROXY_MAIL_RECORDS', true), FILTER_VALIDATE_BOOL),
+
+    /*
     |--------------------------------------------------------------------------
     | Proxy Policy
     |--------------------------------------------------------------------------

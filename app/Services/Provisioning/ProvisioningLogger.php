@@ -47,6 +47,11 @@ class ProvisioningLogger
     /** @param array<string, mixed> $response */
     public function failed(ProvisioningJob $job, string $message, array $response = [], bool $manualReview = false): void
     {
+        // A transport error can carry a request URL with a password/token in
+        // its message. Redact once here so every downstream sink (the stored
+        // error_message, the log, and the admin alert email) is safe.
+        $message = \App\Support\Secrets::redact($message);
+
         $job->markFailed($message, $this->sanitise($response), $manualReview);
 
         // Surface the failure on the order so the customer sees a safe
@@ -100,14 +105,8 @@ class ProvisioningLogger
      */
     private function sanitise(array $payload): array
     {
-        $redactKeys = ['password', 'token', 'api_token', 'key', 'secret', 'authorization'];
-
-        array_walk_recursive($payload, function (&$value, $key) use ($redactKeys) {
-            if (is_string($key) && in_array(strtolower($key), $redactKeys, true)) {
-                $value = '[redacted]';
-            }
-        });
-
-        return $payload;
+        // Masks sensitive keys AND redacts secrets embedded in string values
+        // (e.g. a URL query string carrying password=…).
+        return \App\Support\Secrets::redactArray($payload);
     }
 }
