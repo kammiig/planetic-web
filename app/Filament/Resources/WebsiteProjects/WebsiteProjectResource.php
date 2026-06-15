@@ -35,7 +35,8 @@ class WebsiteProjectResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            \App\Filament\Resources\WebsiteProjects\RelationManagers\MessagesRelationManager::class,
+            \App\Filament\Resources\WebsiteProjects\RelationManagers\MeetingsRelationManager::class,
         ];
     }
 

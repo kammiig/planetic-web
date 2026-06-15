@@ -137,6 +137,29 @@ class WhmService
         return $this->assertOk($this->request('changepackage', ['user' => $username, 'pkg' => $package], 'change package'));
     }
 
+    /**
+     * Create a one-time cPanel login session for single sign-on. Returns a
+     * short-lived URL the browser is redirected to — it carries a one-time
+     * token, never the account password. (WHM API: create_user_session.)
+     *
+     * @throws WhmException
+     */
+    public function createUserSession(string $username, string $service = 'cpaneld'): string
+    {
+        $response = $this->request('create_user_session', [
+            'user' => $username,
+            'service' => $service,
+        ], 'create cPanel session');
+
+        $url = $response['data']['url'] ?? $response['url'] ?? null;
+
+        if (blank($url)) {
+            throw new WhmException('WHM create_user_session returned no URL.', context: $this->safeContext($response['metadata'] ?? []));
+        }
+
+        return (string) $url;
+    }
+
     /** @return array<int, array<string, mixed>> */
     public function listAccounts(): array
     {

@@ -34,10 +34,11 @@
             @endif
         </dl>
 
-        @if ($account->cpanel_url && $account->isActive())
+        @if ($account->isActive() && $account->whm_username)
             <div class="mt-6">
-                <a href="{{ $account->cpanel_url }}" target="_blank" rel="noopener" class="btn-primary btn-sm">Open cPanel</a>
-                <p class="mt-2 text-xs text-slate-500">Opens your cPanel control panel in a new tab.</p>
+                {{-- One-click SSO: opens a secure one-time cPanel session, no password needed. --}}
+                <a href="{{ route('customer.hosting.cpanel', $account) }}" target="_blank" rel="noopener" class="btn-primary btn-sm">Open cPanel</a>
+                <p class="mt-2 text-xs text-slate-500">Logs you straight into your cPanel control panel in a new tab — no password required.</p>
             </div>
         @endif
     </div>

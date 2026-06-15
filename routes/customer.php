@@ -31,6 +31,9 @@ Route::middleware(['auth'])->group(function () {
         // Hosting
         Route::get('hosting', [HostingController::class, 'index'])->name('hosting.index');
         Route::get('hosting/{hostingAccount}', [HostingController::class, 'show'])->name('hosting.show');
+        Route::get('hosting/{hostingAccount}/cpanel', [HostingController::class, 'cpanelSso'])
+            ->middleware('throttle:10,1')
+            ->name('hosting.cpanel');
 
         // Billing & invoices
         Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
@@ -42,11 +45,15 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('throttle:10,1')
             ->name('orders.domain');
 
-        // Website projects
+        // Website projects (workspace: intake, messages, revisions, meetings)
         Route::get('website-projects', [WebsiteProjectController::class, 'index'])->name('projects.index');
         Route::get('website-projects/{project}', [WebsiteProjectController::class, 'show'])->name('projects.show');
         Route::post('website-projects/{project}/intake', [WebsiteProjectController::class, 'storeIntake'])->name('projects.intake');
+        Route::post('website-projects/{project}/messages', [WebsiteProjectController::class, 'storeMessage'])->middleware('throttle:30,1')->name('projects.messages.store');
+        Route::post('website-projects/{project}/revision', [WebsiteProjectController::class, 'requestRevision'])->middleware('throttle:10,1')->name('projects.revision');
+        Route::post('website-projects/{project}/meeting', [WebsiteProjectController::class, 'requestMeeting'])->middleware('throttle:10,1')->name('projects.meeting');
         Route::get('website-projects/{project}/assets/{asset}', [WebsiteProjectController::class, 'downloadAsset'])->name('projects.assets.download');
+        Route::get('website-projects/{project}/messages/{attachment}/download', [WebsiteProjectController::class, 'downloadMessageAttachment'])->name('projects.messages.download');
 
         // Support tickets
         Route::get('support', [SupportTicketController::class, 'index'])->name('support.index');

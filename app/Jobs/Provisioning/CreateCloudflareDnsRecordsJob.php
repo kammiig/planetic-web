@@ -31,16 +31,21 @@ class CreateCloudflareDnsRecordsJob extends ProvisioningStepJob
         }
 
         $dryRun = (bool) config('provisioning.dry_run', false);
+
+        // The WHM-assigned IP on the hosting account is authoritative — it is
+        // the server the account actually lives on. config('whm.server_ip') is
+        // only a fallback for domain-only edge cases; relying on it for a
+        // hosting order produced records pointing at the wrong server.
         $serverIp = $order->hostingAccount()->value('server_ip') ?: config('whm.server_ip');
 
         if (blank($serverIp)) {
             // In dry-run there may be no real server IP configured; records are
             // only simulated, so a placeholder is fine. In live mode a missing
-            // WHM_SERVER_IP is a genuine config error worth surfacing.
+            // server IP is a genuine config error worth surfacing.
             if ($dryRun) {
                 $serverIp = '127.0.0.1';
             } else {
-                throw new ProvisioningException('No server IP available for DNS records — set WHM_SERVER_IP.');
+                throw new ProvisioningException('No server IP available for DNS records — the hosting account has no assigned IP yet.');
             }
         }
 
@@ -52,17 +57,16 @@ class CreateCloudflareDnsRecordsJob extends ProvisioningStepJob
         $created = 0;
         $updated = 0;
         foreach ($records as $i => $record) {
-            // Match an existing local record. MX/TXT can repeat on the same
-            // name, so they are keyed by content too (3 MX all live on '@').
-            $query = $zone->dnsRecords()
-                ->where('type', $record['type'])
-                ->where('name', $record['name']);
-
-            if (in_array($record['type'], ['MX', 'TXT'], true)) {
-                $query->where('content', $record['content']);
+            // Identity of a logical record. Only MX repeats on the same name
+            // (3 exchangers on '@'), so MX is keyed by content too; everything
+            // else (A/CNAME/SPF/DMARC) is one-per-name, so its content (e.g. the
+            // server IP) UPDATES in place rather than spawning a duplicate.
+            $matchAttrs = ['type' => $record['type'], 'name' => $record['name']];
+            if ($record['type'] === 'MX') {
+                $matchAttrs['content'] = $record['content'];
             }
 
-            $local = $query->first();
+            $local = $zone->dnsRecords()->where($matchAttrs)->first();
 
             $payload = [
                 'type' => $record['type'],
@@ -75,20 +79,21 @@ class CreateCloudflareDnsRecordsJob extends ProvisioningStepJob
                 $payload['priority'] = $record['priority'];
             }
 
+            $attributes = [
+                'user_id' => $order->user_id,
+                'cloudflare_zone_id' => $zone->id,
+                'content' => $record['content'],
+                'ttl' => $record['ttl'],
+                'proxied' => $record['proxied'],
+                'priority' => $record['priority'] ?? null,
+                'status' => 'active',
+            ];
+
             // Safe test mode: persist locally without calling Cloudflare.
             if ($dryRun) {
-                $domain->dnsRecords()->updateOrCreate(
-                    ['type' => $record['type'], 'name' => $record['name'], 'content' => $record['content']],
-                    [
-                        'user_id' => $order->user_id,
-                        'cloudflare_zone_id' => $zone->id,
-                        'cloudflare_record_id' => 'dry-run-'.$record['type'].'-'.$i,
-                        'ttl' => $record['ttl'],
-                        'proxied' => $record['proxied'],
-                        'priority' => $record['priority'] ?? null,
-                        'status' => 'active',
-                    ],
-                );
+                $domain->dnsRecords()->updateOrCreate($matchAttrs, $attributes + [
+                    'cloudflare_record_id' => $local?->cloudflare_record_id ?: 'dry-run-'.$record['type'].'-'.$i,
+                ]);
                 $local ? $updated++ : $created++;
 
                 continue;
@@ -98,13 +103,7 @@ class CreateCloudflareDnsRecordsJob extends ProvisioningStepJob
                 if ($local && filled($local->cloudflare_record_id)) {
                     // Already in Cloudflare → update it (keeps content/proxy in sync).
                     $cloudflare->updateDnsRecord($zone->zone_id, $local->cloudflare_record_id, $payload);
-                    $local->update([
-                        'content' => $record['content'],
-                        'ttl' => $record['ttl'],
-                        'proxied' => $record['proxied'],
-                        'priority' => $record['priority'] ?? null,
-                        'status' => 'active',
-                    ]);
+                    $local->update($attributes);
                     $updated++;
 
                     continue;
@@ -113,33 +112,12 @@ class CreateCloudflareDnsRecordsJob extends ProvisioningStepJob
                 $cfRecord = $cloudflare->createDnsRecord($zone->zone_id, $payload);
             } catch (CloudflareException $e) {
                 // One bad record shouldn't abort the rest; record it and move on.
-                $domain->dnsRecords()->updateOrCreate(
-                    ['type' => $record['type'], 'name' => $record['name'], 'content' => $record['content']],
-                    [
-                        'user_id' => $order->user_id,
-                        'cloudflare_zone_id' => $zone->id,
-                        'ttl' => $record['ttl'],
-                        'proxied' => $record['proxied'],
-                        'priority' => $record['priority'] ?? null,
-                        'status' => 'failed',
-                    ],
-                );
+                $domain->dnsRecords()->updateOrCreate($matchAttrs, $attributes + ['status' => 'failed']);
 
                 continue;
             }
 
-            $domain->dnsRecords()->updateOrCreate(
-                ['type' => $record['type'], 'name' => $record['name'], 'content' => $record['content']],
-                [
-                    'user_id' => $order->user_id,
-                    'cloudflare_zone_id' => $zone->id,
-                    'cloudflare_record_id' => $cfRecord['id'],
-                    'ttl' => $record['ttl'],
-                    'proxied' => $record['proxied'],
-                    'priority' => $record['priority'] ?? null,
-                    'status' => 'active',
-                ],
-            );
+            $domain->dnsRecords()->updateOrCreate($matchAttrs, $attributes + ['cloudflare_record_id' => $cfRecord['id']]);
             $created++;
         }
 

@@ -12,6 +12,7 @@ enum WebsiteProjectStatus: string implements \Filament\Support\Contracts\HasColo
     case DesignInProgress = 'design_in_progress';
     case ReviewRequired = 'review_required';
     case RevisionsInProgress = 'revisions_in_progress';
+    case Delivered = 'delivered';
     case Approved = 'approved';
     case Launched = 'launched';
     case Completed = 'completed';
@@ -25,8 +26,9 @@ enum WebsiteProjectStatus: string implements \Filament\Support\Contracts\HasColo
             self::InformationRequired => 'Information Required',
             self::ContentReceived => 'Content Received',
             self::DesignInProgress => 'Design In Progress',
-            self::ReviewRequired => 'Review Required',
+            self::ReviewRequired => 'Ready for Review',
             self::RevisionsInProgress => 'Revisions In Progress',
+            self::Delivered => 'Delivered',
             self::Approved => 'Approved',
             self::Launched => 'Launched',
             self::Completed => 'Completed',
@@ -38,7 +40,7 @@ enum WebsiteProjectStatus: string implements \Filament\Support\Contracts\HasColo
     public function badgeClass(): string
     {
         return match ($this) {
-            self::Completed, self::Launched, self::Approved => 'badge-success',
+            self::Completed, self::Launched, self::Approved, self::Delivered => 'badge-success',
             self::InformationRequired, self::ReviewRequired => 'badge-warning',
             self::OnHold, self::Cancelled => 'badge-neutral',
             default => 'badge-primary',
@@ -52,6 +54,7 @@ enum WebsiteProjectStatus: string implements \Filament\Support\Contracts\HasColo
             self::OrderReceived, self::InformationRequired => 'Please complete your website project intake form so our team can begin.',
             self::ReviewRequired => 'Your design is ready to review. Please check your email and dashboard.',
             self::RevisionsInProgress => 'We are working on your requested revisions.',
+            self::Delivered => 'Your website has been delivered. Review it and request a revision if anything needs changing.',
             default => null,
         };
     }

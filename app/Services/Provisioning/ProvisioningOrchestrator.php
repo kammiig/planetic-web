@@ -24,17 +24,19 @@ use Illuminate\Support\Facades\Log;
 class ProvisioningOrchestrator
 {
     /**
-     * Canonical execution order. DNS records are created right after the zone
-     * and BEFORE the cPanel account, so a slow/failed WHM step can never block
-     * DNS from being set up (the zone → records → hosting sequence the
-     * customer expects). SSL mode is configured inside the zone step.
+     * Canonical execution order. The cPanel account is created BEFORE the DNS
+     * records so the A/SPF records use the real server IP that WHM assigns at
+     * createacct time — not a stale config fallback. WHM is reliable now (120s
+     * timeout + listaccts reconciliation), so this no longer risks the
+     * "zone created but no records" problem that motivated the earlier order.
+     * SSL mode is configured inside the zone step.
      */
     private const ORDER = [
         'register_domain',
         'create_cloudflare_zone',
-        'create_dns_records',
         'update_nameservers',
         'create_hosting_account',
+        'create_dns_records',
         'send_welcome_email',
     ];
 
