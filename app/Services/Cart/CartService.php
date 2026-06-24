@@ -8,6 +8,7 @@ use App\Enums\ProductType;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Product;
+use App\Models\TldPricing;
 use App\Support\DomainName;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -229,7 +230,12 @@ class CartService
         $product = Product::ofType(ProductType::Domain)->active()->with('activePrices')->first();
         $price = $product?->priceFor('yearly');
 
-        return [$product, $price, 'Domain registration: '.$domainName, (float) ($price?->amount ?? 12.99), 'yearly'];
+        // The customer-facing charge comes from the admin TLD price book
+        // (per-TLD), falling back to the flat catalogue price when unlisted.
+        $unitPrice = TldPricing::priceForDomain($domainName)
+            ?? (float) ($price?->amount ?? 12.99);
+
+        return [$product, $price, 'Domain registration: '.$domainName, $unitPrice, 'yearly'];
     }
 
     /*

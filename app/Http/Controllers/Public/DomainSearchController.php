@@ -6,6 +6,7 @@ use App\Actions\Domains\CheckDomainAvailability;
 use App\Exceptions\RegistrarException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DomainSearchRequest;
+use App\Models\TldPricing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
@@ -17,6 +18,8 @@ class DomainSearchController extends Controller
         return view('public.domain-search', [
             'websitePackagePrice' => (float) config('billing.website_package.price', 200),
             'freeYearNotice' => config('billing.website_package.free_year_notice'),
+            'featuredTlds' => TldPricing::active()->where('is_featured', true)->orderBy('sort_order')->get(),
+            'tldPrices' => TldPricing::active()->orderBy('sort_order')->get(),
         ]);
     }
 

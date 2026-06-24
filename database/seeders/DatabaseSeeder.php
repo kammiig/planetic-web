@@ -19,6 +19,12 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             ProductSeeder::class,
             HostingPackageSeeder::class,
+            WebsitePackageSeeder::class,
+            TldPricingSeeder::class,
+            SiteSettingSeeder::class,
+            SeoMetaSeeder::class,
+            FaqSeeder::class,
+            TestimonialSeeder::class,
             AdminUserSeeder::class,
         ]);
     }

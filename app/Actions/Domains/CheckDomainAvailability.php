@@ -5,6 +5,7 @@ namespace App\Actions\Domains;
 use App\Enums\ProductType;
 use App\Exceptions\RegistrarException;
 use App\Models\Product;
+use App\Models\TldPricing;
 use App\Services\Registrar\RegistrarInterface;
 use App\Support\DomainName;
 use Illuminate\Support\Facades\Cache;
@@ -30,7 +31,7 @@ class CheckDomainAvailability
     {
         $domain = DomainName::normalise($domain);
         $result = $this->lookup($domain);
-        $price = $this->displayPrice();
+        $price = $this->priceForDomain($domain);
 
         return [
             'success' => true,
@@ -40,10 +41,10 @@ class CheckDomainAvailability
             'price' => $result['available'] ? $price : null,
             'currency' => 'GBP',
             // Kept for the homepage hero (only when the exact name is taken).
-            'suggestions' => $result['available'] ? [] : $this->suggestions($domain, $price),
+            'suggestions' => $result['available'] ? [] : $this->suggestions($domain),
             // A richer set of available alternative TLDs for the full search page.
             // Guarded so the lightweight hero search does not pay the extra lookups.
-            'alternatives' => $withAlternatives ? $this->alternatives($domain, $price) : [],
+            'alternatives' => $withAlternatives ? $this->alternatives($domain) : [],
         ];
     }
 
@@ -54,13 +55,13 @@ class CheckDomainAvailability
      *
      * @return array<int, array{domain: string, available: bool, price: string}>
      */
-    private function alternatives(string $domain, string $price): array
+    private function alternatives(string $domain): array
     {
         $parsed = DomainName::parse($domain);
         $out = [];
         $checked = 0;
 
-        foreach (config('domain.suggestion_tlds', []) as $tld) {
+        foreach ($this->suggestionTlds() as $tld) {
             if (count($out) >= 8 || $checked >= 10) {
                 break;
             }
@@ -82,7 +83,7 @@ class CheckDomainAvailability
             }
 
             if (! empty($check['available'])) {
-                $out[] = ['domain' => $candidate, 'available' => true, 'price' => $price];
+                $out[] = ['domain' => $candidate, 'available' => true, 'price' => $this->priceForDomain($candidate)];
             }
         }
 
@@ -107,12 +108,12 @@ class CheckDomainAvailability
     /**
      * @return array<int, array{domain: string, available: bool, price: string}>
      */
-    private function suggestions(string $domain, string $price): array
+    private function suggestions(string $domain): array
     {
         $parsed = DomainName::parse($domain);
         $suggestions = [];
 
-        foreach (config('domain.suggestion_tlds', []) as $tld) {
+        foreach ($this->suggestionTlds() as $tld) {
             if (count($suggestions) >= 3) {
                 break;
             }
@@ -133,18 +134,39 @@ class CheckDomainAvailability
             }
 
             if (! empty($check['available'])) {
-                $suggestions[] = ['domain' => $candidate, 'available' => true, 'price' => $price];
+                $suggestions[] = ['domain' => $candidate, 'available' => true, 'price' => $this->priceForDomain($candidate)];
             }
         }
 
         return $suggestions;
     }
 
-    /** Standard GBP yearly domain price from our catalogue. */
-    private function displayPrice(): string
+    /**
+     * Alternative TLDs to suggest. Prefers the active, admin-managed TLD price
+     * book (so suggestions and pricing stay in sync), falling back to config.
+     *
+     * @return array<int, string>
+     */
+    private function suggestionTlds(): array
     {
-        $amount = Product::ofType(ProductType::Domain)->active()->first()?->priceFor('yearly')?->amount;
+        $fromBook = TldPricing::activeMap()->keys()->all();
 
-        return number_format((float) ($amount ?? 12.99), 2, '.', '');
+        return $fromBook ?: config('domain.suggestion_tlds', []);
+    }
+
+    /**
+     * Customer-facing GBP price for a specific domain, resolved from the admin
+     * TLD price book (longest-matching suffix). Falls back to the legacy flat
+     * catalogue price, then to a hard default, so search never breaks.
+     */
+    private function priceForDomain(string $domain): string
+    {
+        $price = TldPricing::priceForDomain($domain);
+
+        if ($price === null) {
+            $price = Product::ofType(ProductType::Domain)->active()->first()?->priceFor('yearly')?->amount ?? 12.99;
+        }
+
+        return number_format((float) $price, 2, '.', '');
     }
 }

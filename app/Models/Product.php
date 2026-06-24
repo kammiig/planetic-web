@@ -37,6 +37,11 @@ class Product extends Model
         return $this->hasOne(HostingPackage::class);
     }
 
+    public function websitePackage(): HasOne
+    {
+        return $this->hasOne(WebsitePackage::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);

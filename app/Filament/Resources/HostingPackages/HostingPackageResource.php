@@ -18,9 +18,17 @@ class HostingPackageResource extends Resource
 {
     protected static ?string $model = HostingPackage::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedServerStack;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Catalogue';
+
+    protected static ?string $navigationLabel = 'Hosting Plans';
+
+    protected static ?string $modelLabel = 'hosting plan';
+
+    protected static ?string $recordTitleAttribute = 'name';
+
+    protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema
     {

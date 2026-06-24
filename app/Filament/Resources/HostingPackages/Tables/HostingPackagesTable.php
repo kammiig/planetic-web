@@ -5,8 +5,8 @@ namespace App\Filament\Resources\HostingPackages\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Table;
 
 class HostingPackagesTable
@@ -14,41 +14,35 @@ class HostingPackagesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->reorderable('sort_order')
+            ->defaultSort('sort_order')
             ->columns([
-                TextColumn::make('product.name')
-                    ->searchable(),
                 TextColumn::make('name')
-                    ->searchable(),
+                    ->label('Plan')
+                    ->description(fn ($record) => $record->tagline)
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('monthly_price')
+                    ->label('Monthly')
+                    ->money('GBP')
+                    ->state(fn ($record) => $record->product?->priceFor('monthly')?->amount),
+                TextColumn::make('yearly_price')
+                    ->label('Yearly')
+                    ->money('GBP')
+                    ->state(fn ($record) => $record->product?->priceFor('yearly')?->amount),
                 TextColumn::make('whm_package_name')
+                    ->label('WHM package')
+                    ->badge()
+                    ->color('gray')
                     ->searchable(),
                 TextColumn::make('disk_limit_mb')
-                    ->numeric()
+                    ->label('Disk')
+                    ->state(fn ($record) => $record->diskLabel())
                     ->sortable(),
-                TextColumn::make('bandwidth_limit_mb')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('email_accounts_limit')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('database_limit')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('domain_limit')
-                    ->numeric()
-                    ->sortable(),
-                IconColumn::make('is_active')
-                    ->boolean(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
-            ->filters([
-                //
+                ToggleColumn::make('is_popular')
+                    ->label('Popular'),
+                ToggleColumn::make('is_active')
+                    ->label('Active'),
             ])
             ->recordActions([
                 EditAction::make(),

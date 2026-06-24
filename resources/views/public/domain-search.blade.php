@@ -18,8 +18,8 @@
         <section class="border-b border-slate-200 bg-white">
             <div class="container-px py-10 sm:py-12">
                 <div class="mx-auto max-w-3xl text-center">
-                    <h1 class="text-3xl font-extrabold sm:text-4xl">Find your perfect domain</h1>
-                    <p class="mt-2 text-slate-600">Search, register and manage your domain — DNS and SSL set up automatically.</p>
+                    <h1 class="text-3xl font-extrabold sm:text-4xl">{{ setting('domains.title', 'Find your perfect domain name') }}</h1>
+                    <p class="mt-2 text-slate-600">{{ setting('domains.subtitle', 'Search, register and manage your domain — DNS and SSL set up automatically.') }}</p>
                 </div>
 
                 <form @submit.prevent="search" role="search" aria-label="Domain availability search"
@@ -177,11 +177,14 @@
                 <template x-if="!result && !loading && !error">
                     <div class="text-center">
                         <p class="text-slate-600">Start by searching for your business name above.</p>
-                        <div class="mx-auto mt-5 flex max-w-2xl flex-wrap justify-center gap-2">
-                            @foreach (['.co.uk' => '9.99', '.com' => '12.99', '.net' => '13.99', '.org' => '12.99', '.uk' => '8.99', '.io' => '39.99'] as $tld => $price)
-                                <span class="badge badge-neutral text-sm">{{ $tld }} <span class="font-bold text-primary-600">£{{ $price }}/yr</span></span>
-                            @endforeach
-                        </div>
+                        @php $chips = $featuredTlds->isNotEmpty() ? $featuredTlds : $tldPrices->take(8); @endphp
+                        @if ($chips->isNotEmpty())
+                            <div class="mx-auto mt-5 flex max-w-2xl flex-wrap justify-center gap-2">
+                                @foreach ($chips as $tld)
+                                    <span class="badge badge-neutral text-sm">.{{ ltrim($tld->tld, '.') }} <span class="font-bold text-primary-600">£{{ number_format($tld->register_price, 2) }}/yr</span></span>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
                 </template>
             </div>

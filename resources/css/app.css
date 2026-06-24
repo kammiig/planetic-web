@@ -230,4 +230,46 @@
     .nav-link-active {
         @apply bg-primary-50 text-primary-600;
     }
+
+    /* ---- Premium marketing helpers ---- */
+    .eyebrow {
+        @apply text-sm font-semibold uppercase tracking-[0.12em] text-accent-cyan;
+    }
+    .gradient-text {
+        background: linear-gradient(100deg, #38bdf8 0%, #06b6d4 50%, #818cf8 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+    .lift {
+        @apply transition duration-200 hover:-translate-y-1 hover:shadow-large;
+    }
+    /* Plan card emphasised as the popular choice */
+    .card-popular {
+        @apply relative border-2 border-primary-500 shadow-large;
+    }
+    /* Decorative dotted glow behind the hero console */
+    .hero-grid {
+        background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+        background-size: 22px 22px;
+    }
+    .stat-value {
+        @apply text-3xl font-extrabold text-white sm:text-4xl;
+    }
+    .stat-label {
+        @apply mt-1 text-sm text-slate-300;
+    }
+    .tld-pill {
+        @apply inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-soft;
+    }
+    .feature-check {
+        @apply mt-0.5 grid h-5 w-5 flex-shrink-0 place-items-center rounded-full bg-success/10 text-success;
+    }
+    .stars {
+        @apply text-base leading-none tracking-tight;
+        color: #f59e0b;
+    }
+    .section {
+        @apply py-16 lg:py-20;
+    }
 }

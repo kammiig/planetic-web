@@ -98,4 +98,19 @@ return [
 
     'request_timeout' => (int) env('DOMAIN_REQUEST_TIMEOUT', 30),
 
+    /*
+    |--------------------------------------------------------------------------
+    | USD → GBP conversion (admin reference only)
+    |--------------------------------------------------------------------------
+    |
+    | Registrars (e.g. Porkbun) quote wholesale prices in USD. When an admin
+    | syncs cost prices into the TLD price book this factor converts them to
+    | GBP for the internal cost_price/markup reference figures. It never
+    | affects the customer-facing selling price, which is the admin-set
+    | register_price in GBP.
+    |
+    */
+
+    'usd_to_gbp' => (float) env('DOMAIN_USD_TO_GBP', 0.79),
+
 ];
