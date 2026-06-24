@@ -4,9 +4,9 @@ Automated **website, hosting, domain, DNS, billing, renewal and client-managemen
 
 Customers search a domain, buy a complete bespoke website (£200) or hosting, pay securely through
 Stripe, and — once the charge is **verified server-to-server with the Stripe API** — the platform
-automatically registers the domain (NameSilo), creates a Cloudflare DNS zone, points the registrar
-nameservers at Cloudflare, provisions a cPanel account via WHM, creates the default DNS records, and
-emails the customer. Everything is visible in a customer dashboard and a Filament admin panel.
+automatically registers the domain (Porkbun by default), creates a Cloudflare DNS zone, points the
+registrar nameservers at Cloudflare, provisions a cPanel account via WHM, creates the default DNS
+records, and emails the customer. Everything is visible in a customer dashboard and a Filament admin panel.
 
 Payment is confirmed through **three independent, idempotent paths** (whichever runs first wins —
 the others become no-ops): the signed Stripe webhook, the checkout success page (which asks the
@@ -27,7 +27,7 @@ Stripe API directly — the browser is never trusted), and the every-10-minutes
 | Admin | Filament v4 |
 | Database | MySQL 8+ (SQLite for local dev/tests) |
 | Payments | Stripe Checkout + Webhooks |
-| Domains | NameSilo API (primary), Namecheap API (backup) |
+| Domains | Porkbun API (default), NameSilo + Namecheap (optional fallbacks) |
 | Hosting | Namecheap WHM / cPanel API |
 | DNS | Cloudflare API |
 | Email | cPanel SMTP (Jellyfish filtering) |
@@ -106,13 +106,43 @@ In cPanel → *Domains* (or *Addon/Subdomains*), set the document root for `plan
 ### 2. Environment
 
 Copy `.env.example` to `.env` and fill in real values (MySQL credentials, Stripe live keys + webhook
-secret, NameSilo/Namecheap, WHM, Cloudflare, cPanel SMTP, operational emails). Then:
+secret, the domain registrar, WHM, Cloudflare, cPanel SMTP, operational emails). Then:
 
 ```
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://planeticweb.com
 SESSION_SECURE_COOKIE=true
+```
+
+#### Domain registrar
+
+The active registrar is chosen with `DEFAULT_REGISTRAR` and drives **all** domain actions —
+search, availability, pricing, registration and nameserver updates. **Porkbun is the default**
+(cheapest); NameSilo and Namecheap remain optional fallbacks and are used only when selected. API
+keys are read from the environment only — never hard-coded, logged, emailed or shown in the admin UI.
+
+```
+DEFAULT_REGISTRAR=porkbun          # porkbun | namesilo | namecheap
+
+PORKBUN_ENABLED=true
+PORKBUN_API_KEY=...                # from Porkbun → Account → API Access
+PORKBUN_SECRET_KEY=...
+
+# Optional fallbacks (off by default; only used if DEFAULT_REGISTRAR names them)
+NAMESILO_ENABLED=false
+NAMESILO_API_KEY=
+NAMECHEAP_ENABLED=false
+```
+
+Notes specific to Porkbun: registration draws from your **Porkbun account balance** (keep it funded),
+registers for **exactly one year** (matching the free-first-year rule), and applies WHOIS privacy.
+Verify the live connection any time with:
+
+```bash
+php artisan registrar:test                              # show active registrar + credential check
+php artisan registrar:test example.com                  # + availability & pricing
+php artisan registrar:test some-free-name.com --register # + a no-charge Porkbun dry-run registration
 ```
 
 ### 3. Build & install

@@ -8,20 +8,43 @@ return [
     |--------------------------------------------------------------------------
     |
     | Selects which registrar implementation the RegistrarInterface binding
-    | resolves to. NameSilo is the primary registrar; Namecheap is the backup.
-    | Swappable purely through configuration — no code changes required.
+    | resolves to. Porkbun is the primary/default registrar (cheapest);
+    | NameSilo and Namecheap remain optional fallbacks, used only when
+    | DEFAULT_REGISTRAR names them. Swappable purely through configuration —
+    | no code changes required.
+    |
+    | DEFAULT_REGISTRAR is the canonical variable; DOMAIN_REGISTRAR is honoured
+    | as a legacy alias so existing deployments keep working.
     |
     */
 
-    'default_registrar' => env('DOMAIN_REGISTRAR', 'namesilo'),
+    'default_registrar' => env('DEFAULT_REGISTRAR', env('DOMAIN_REGISTRAR', 'porkbun')),
 
     /*
     |--------------------------------------------------------------------------
-    | NameSilo (Primary)
+    | Porkbun (Primary / Default)
+    |--------------------------------------------------------------------------
+    |
+    | API v3. Credentials are read only from the server environment and are
+    | never exposed to the frontend, logs, emails or admin screens.
+    |
+    */
+
+    'porkbun' => [
+        'enabled' => filter_var(env('PORKBUN_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'api_key' => env('PORKBUN_API_KEY'),
+        'secret_key' => env('PORKBUN_SECRET_KEY'),
+        'endpoint' => env('PORKBUN_API_ENDPOINT', 'https://api.porkbun.com/api/json/v3'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | NameSilo (Optional fallback)
     |--------------------------------------------------------------------------
     */
 
     'namesilo' => [
+        'enabled' => filter_var(env('NAMESILO_ENABLED', true), FILTER_VALIDATE_BOOL),
         'api_key' => env('NAMESILO_API_KEY'),
         'endpoint' => env('NAMESILO_API_ENDPOINT', 'https://www.namesilo.com/api'),
         'sandbox' => filter_var(env('NAMESILO_SANDBOX', false), FILTER_VALIDATE_BOOL),
@@ -29,11 +52,12 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Namecheap (Backup)
+    | Namecheap (Optional fallback)
     |--------------------------------------------------------------------------
     */
 
     'namecheap' => [
+        'enabled' => filter_var(env('NAMECHEAP_ENABLED', true), FILTER_VALIDATE_BOOL),
         'api_user' => env('NAMECHEAP_API_USER'),
         'api_key' => env('NAMECHEAP_API_KEY'),
         'username' => env('NAMECHEAP_USERNAME'),
@@ -49,7 +73,8 @@ return [
     |
     | Defaults applied when registering a domain. WHOIS privacy and auto-renew
     | are enabled by default; the registration term is one year (the free
-    | first-year term included with the website package).
+    | first-year term included with the website package). Note: the Porkbun
+    | API always registers for one year, which matches this default.
     |
     */
 

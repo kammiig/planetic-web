@@ -15,6 +15,8 @@ class Secrets
     private const SENSITIVE_KEYS = [
         'password', 'pass', 'pwd', 'token', 'api.token', 'api_token',
         'apikey', 'api_key', 'key', 'secret', 'authorization', 'auth',
+        // Porkbun uses these exact body keys for its API credentials.
+        'secretapikey', 'secret_key', 'secretkey',
     ];
 
     public static function redact(?string $text): string

@@ -41,6 +41,17 @@ class NamecheapRegistrar implements RegistrarInterface
         ];
     }
 
+    public function getPricing(string $tld): array
+    {
+        $tld = strtolower(trim($tld));
+        $tld = str_contains($tld, '.') ? substr($tld, strpos($tld, '.') + 1) : ltrim($tld, '.');
+
+        // Namecheap's pricing API (namecheap.users.getPricing) is not wired —
+        // the platform prices domains from its own GBP catalogue. Reported as
+        // unsupported so callers fall back cleanly ("getPricing if available").
+        return ['tld' => $tld, 'registration' => null, 'renewal' => null, 'transfer' => null, 'currency' => 'USD', 'supported' => false];
+    }
+
     public function registerDomain(array $data): array
     {
         [$sld, $tld] = $this->splitDomain($data['domain']);

@@ -3,6 +3,7 @@
 namespace App\Services\Registrar;
 
 use App\Exceptions\RegistrarException;
+use App\Support\DomainName;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -27,6 +28,45 @@ class NameSiloRegistrar implements RegistrarInterface
         $reply = $this->request('checkRegisterAvailability', ['domains' => strtolower($domain)], 'availability check');
 
         return $this->parser->nameSiloAvailability($reply, $domain);
+    }
+
+    public function getPricing(string $tld): array
+    {
+        $tld = $this->tldOf($tld);
+        $reply = $this->request('getPrices', [], 'pricing');
+        $row = $reply[$tld] ?? null;
+
+        if (! is_array($row)) {
+            return ['tld' => $tld, 'registration' => null, 'renewal' => null, 'transfer' => null, 'currency' => 'USD', 'supported' => false];
+        }
+
+        return [
+            'tld' => $tld,
+            'registration' => $this->scalar($row['registration'] ?? null),
+            // NameSilo names the renewal price "renew".
+            'renewal' => $this->scalar($row['renew'] ?? $row['renewal'] ?? null),
+            'transfer' => $this->scalar($row['transfer'] ?? null),
+            'currency' => 'USD',
+            'supported' => true,
+        ];
+    }
+
+    /** Normalise a TLD or full domain to its registrable TLD. */
+    private function tldOf(string $tldOrDomain): string
+    {
+        $value = ltrim(strtolower(trim($tldOrDomain)), '.');
+
+        return str_contains($value, '.') ? DomainName::parse($value)->tld : $value;
+    }
+
+    /** A price field may be a scalar or a per-year list; reduce to a string. */
+    private function scalar(mixed $value): ?string
+    {
+        if (is_array($value)) {
+            $value = reset($value);
+        }
+
+        return $value === null || $value === false ? null : (string) $value;
     }
 
     public function registerDomain(array $data): array

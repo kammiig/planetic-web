@@ -29,6 +29,13 @@ class DomainsTable
                 TextColumn::make('tld')
                     ->searchable(),
                 TextColumn::make('registrar')
+                    ->badge()
+                    ->color(fn (?string $state): string => match ($state) {
+                        'porkbun' => 'success',
+                        'namesilo' => 'info',
+                        'namecheap' => 'warning',
+                        default => 'gray',
+                    })
                     ->searchable(),
                 TextColumn::make('registrar_domain_id')
                     ->searchable(),

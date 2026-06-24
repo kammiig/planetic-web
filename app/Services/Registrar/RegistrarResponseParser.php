@@ -134,4 +134,76 @@ class RegistrarResponseParser
 
         return [];
     }
+
+    /**
+     * Assert a Porkbun response succeeded (status === SUCCESS) and return the
+     * decoded JSON. Porkbun reports failures as {status:"ERROR", message:"…"}.
+     *
+     * @param  array<string, mixed>  $json
+     * @return array<string, mixed>
+     */
+    public function porkbunReply(array $json, string $operation): array
+    {
+        if (strtoupper((string) ($json['status'] ?? '')) === 'SUCCESS') {
+            return $json;
+        }
+
+        $message = (string) ($json['message'] ?? 'unknown error');
+        $hint = $this->porkbunHint($message);
+
+        throw new RegistrarException(
+            "Porkbun {$operation} failed: {$message}".($hint ? " — {$hint}" : ''),
+            registrar: 'porkbun',
+            context: $json,
+        );
+    }
+
+    /**
+     * Plain-English admin guidance for the Porkbun failures we expect to see.
+     * Shown in the provisioning monitor and admin alerts — never to customers.
+     */
+    private function porkbunHint(string $message): ?string
+    {
+        $message = strtolower($message);
+
+        return match (true) {
+            str_contains($message, 'api key') || str_contains($message, 'credential') || str_contains($message, 'invalid key')
+                => 'Check PORKBUN_API_KEY / PORKBUN_SECRET_KEY in the server .env — Porkbun rejected the credentials.',
+            str_contains($message, 'balance') || str_contains($message, 'fund') || str_contains($message, 'insufficient')
+                => 'The Porkbun account balance is too low to pay for this registration. Top up funds in the Porkbun dashboard, then retry the step.',
+            str_contains($message, 'api access') || str_contains($message, 'opted in') || str_contains($message, 'not enabled')
+                => 'Enable "API Access" for this domain in the Porkbun control panel before nameserver/DNS calls will work.',
+            str_contains($message, 'not available') || str_contains($message, 'unavailable') || str_contains($message, 'taken')
+                => 'The domain is no longer available to register — agree a different domain with the customer, update the order, and retry.',
+            default => null,
+        };
+    }
+
+    /**
+     * Interpret a Porkbun checkDomain reply for a specific domain. The payload
+     * nests the result under `response` ({avail:"yes"|"no", price, premium}).
+     *
+     * @param  array<string, mixed>  $json
+     * @return array{domain: string, available: bool, premium: bool, price: ?string, currency: string}
+     */
+    public function porkbunAvailability(array $json, string $domain): array
+    {
+        $domain = strtolower($domain);
+        $node = is_array($json['response'] ?? null) ? $json['response'] : $json;
+
+        $avail = strtolower((string) ($node['avail'] ?? ''));
+
+        if ($avail === '') {
+            // Could not determine — never allow checkout for uncertain availability.
+            throw new RegistrarException("Porkbun availability for {$domain} was indeterminate.", registrar: 'porkbun', context: $json);
+        }
+
+        return [
+            'domain' => $domain,
+            'available' => in_array($avail, ['yes', 'true', '1'], true),
+            'premium' => in_array(strtolower((string) ($node['premium'] ?? 'no')), ['yes', 'true', '1'], true),
+            'price' => isset($node['price']) ? (string) $node['price'] : null,
+            'currency' => 'USD',
+        ];
+    }
 }

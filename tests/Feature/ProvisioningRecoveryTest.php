@@ -38,6 +38,7 @@ class ProvisioningRecoveryTest extends TestCase
         // Synchronous provisioning (the production default) + integration config.
         config()->set('provisioning.sync', true);
         config()->set('domain.default_registrar', 'namesilo');
+        config()->set('domain.namesilo.enabled', true);
         config()->set('domain.namesilo.api_key', 'test-key');
         config()->set('cloudflare.api_token', 'cf-token');
         config()->set('cloudflare.account_id', 'cf-account');

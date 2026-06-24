@@ -42,7 +42,11 @@
       "Bash(echo \"build=$?\")",
       "Bash(echo \"phpunit=$?\")",
       "Bash(grep -vE \"storage/logs|public/build|\\\\.env$\")",
-      "Bash(grep -vE \"storage/logs|public/build|\\\\.env$|settings.local|\\\\.phpunit\")"
+      "Bash(grep -vE \"storage/logs|public/build|\\\\.env$|settings.local|\\\\.phpunit\")",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr *)",
+      "Bash(gh repo *)"
     ]
   }
 }

@@ -25,6 +25,7 @@ class ProvisioningTest extends TestCase
         $this->seed([RoleSeeder::class, ProductSeeder::class, HostingPackageSeeder::class]);
 
         config()->set('domain.default_registrar', 'namesilo');
+        config()->set('domain.namesilo.enabled', true);
         config()->set('domain.namesilo.api_key', 'test-key');
         config()->set('cloudflare.api_token', 'cf-token');
         config()->set('cloudflare.account_id', 'cf-account');
@@ -189,5 +190,80 @@ class ProvisioningTest extends TestCase
         $this->assertDatabaseHas('provisioning_jobs', ['order_id' => $order->id, 'job_type' => 'register_domain', 'status' => 'manual_review']);
         // The hosting step must NOT have run — the chain halted.
         $this->assertDatabaseMissing('hosting_accounts', ['order_id' => $order->id]);
+    }
+
+    public function test_full_chain_registers_via_porkbun_and_points_nameservers_to_cloudflare(): void
+    {
+        config()->set('domain.default_registrar', 'porkbun');
+        config()->set('domain.porkbun.api_key', 'pk_test');
+        config()->set('domain.porkbun.secret_key', 'sk_test');
+        config()->set('domain.porkbun.endpoint', 'https://api.porkbun.com/api/json/v3');
+
+        Http::fake(function (Request $request) {
+            $url = $request->url();
+            $path = (string) parse_url($url, PHP_URL_PATH);
+
+            if (str_contains($url, 'api.porkbun.com')) {
+                if (str_contains($path, '/domain/checkDomain/')) {
+                    return Http::response(['status' => 'SUCCESS', 'response' => ['avail' => 'yes', 'price' => '9.68']]);
+                }
+                if (str_contains($path, '/domain/create/')) {
+                    return Http::response(['status' => 'SUCCESS', 'orderId' => 778899, 'cost' => 968]);
+                }
+                if (str_contains($path, '/domain/listAll')) {
+                    return Http::response(['status' => 'SUCCESS', 'domains' => [
+                        ['domain' => 'example.com', 'status' => 'ACTIVE', 'expireDate' => now()->addYear()->format('Y-m-d H:i:s')],
+                    ]]);
+                }
+                if (str_contains($path, '/domain/getNs/')) {
+                    return Http::response(['status' => 'SUCCESS', 'ns' => ['dana.ns.cloudflare.com', 'rob.ns.cloudflare.com']]);
+                }
+
+                // updateNs and anything else.
+                return Http::response(['status' => 'SUCCESS']);
+            }
+
+            if (str_contains($url, 'cloudflare.com')) {
+                if (str_contains($path, '/dns_records')) {
+                    return Http::response(['success' => true, 'result' => ['id' => 'rec_'.uniqid()]]);
+                }
+                if (str_contains($path, '/settings/')) {
+                    return Http::response(['success' => true, 'result' => ['id' => 'setting']]);
+                }
+
+                return Http::response(['success' => true, 'result' => [
+                    'id' => 'zone_pork', 'name' => 'example.com', 'status' => 'pending',
+                    'name_servers' => ['dana.ns.cloudflare.com', 'rob.ns.cloudflare.com'],
+                ]]);
+            }
+
+            if (str_contains($url, 'whm.test')) {
+                return Http::response([
+                    'metadata' => ['result' => 1, 'reason' => 'Account Creation Ok', 'command' => 'createacct'],
+                    'data' => ['ip' => '203.0.113.10', 'nameserver' => 'ns1.planeticweb.com', 'package' => 'kwashqap_starter'],
+                ]);
+            }
+
+            return Http::response([], 200);
+        });
+
+        $order = $this->paidWebsiteOrder();
+        ProvisionOrderJob::dispatch($order->id);
+
+        $order->refresh();
+        $this->assertSame(OrderStatus::Completed, $order->status);
+
+        $domain = $order->domain;
+        $this->assertSame('porkbun', $domain->registrar);
+        $this->assertSame('778899', $domain->registrar_order_id);
+        $this->assertSame('active', $domain->status->value);
+        $this->assertNotNull($domain->cloudflare_zone_id);
+        // Nameservers at Porkbun were switched to Cloudflare's.
+        $this->assertContains('dana.ns.cloudflare.com', $domain->nameservers ?? []);
+
+        // Porkbun received both the registration and the nameserver switch.
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), '/domain/create/example.com'));
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), '/domain/updateNs/example.com')
+            && in_array('dana.ns.cloudflare.com', (array) $r['ns'], true));
     }
 }
