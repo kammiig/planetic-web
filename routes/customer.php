@@ -37,6 +37,12 @@ Route::middleware(['auth'])->group(function () {
 
         // Billing & invoices
         Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
+        Route::get('billing/payment-method', [BillingController::class, 'paymentMethod'])
+            ->middleware('throttle:10,1')->name('billing.payment-method');
+        Route::post('billing/domains/{domain}/auto-renew', [BillingController::class, 'toggleDomainAutoRenew'])
+            ->middleware('throttle:30,1')->name('billing.domains.auto-renew');
+        Route::post('billing/hosting/{hostingAccount}/auto-renew', [BillingController::class, 'toggleHostingAutoRenew'])
+            ->middleware('throttle:30,1')->name('billing.hosting.auto-renew');
         Route::get('invoices/{invoice}', [BillingController::class, 'showInvoice'])->name('invoices.show');
         Route::get('invoices/{invoice}/download', [BillingController::class, 'downloadInvoice'])->name('invoices.download');
 

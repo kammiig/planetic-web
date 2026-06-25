@@ -32,6 +32,7 @@ Alpine.data('checkout', (config = {}) => ({
     orderNumber: null,
     initialising: false,
     paying: false,
+    payStatus: '',
     paymentReady: false,
     formError: '',
     fieldErrors: {},
@@ -277,11 +278,20 @@ Alpine.data('checkout', (config = {}) => ({
 
     /** Confirm payment on-site. redirect:'if_required' keeps simple cards on-page. */
     async pay() {
+        // Guard against double-clicks so we never create a duplicate charge/order.
+        if (this.paying) {
+            return;
+        }
         if (!this.stripe || !this.elements) {
             return;
         }
         this.paying = true;
         this.formError = '';
+        this.payStatus = 'Starting secure payment…';
+
+        // Let the "starting" state paint before the (blocking) confirm call.
+        await this.$nextTick();
+        this.payStatus = 'Please wait — we are preparing your order.';
 
         const { error, paymentIntent } = await this.stripe.confirmPayment({
             elements: this.elements,
@@ -291,11 +301,15 @@ Alpine.data('checkout', (config = {}) => ({
 
         if (error) {
             this.formError = error.message || 'Your payment could not be completed. Please check your details and try again.';
+            this.payStatus = '';
             this.paying = false;
             return;
         }
 
         if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
+            // Stay in the loading state through the redirect so it never looks
+            // stuck, and reassure the customer their services are being set up.
+            this.payStatus = 'Payment successful — setting up your domain & hosting…';
             const separator = this.successUrl.includes('?') ? '&' : '?';
             window.location.assign(
                 this.successUrl + separator + 'payment_intent=' + encodeURIComponent(paymentIntent.id)
@@ -305,6 +319,7 @@ Alpine.data('checkout', (config = {}) => ({
         }
 
         this.formError = 'Your payment is pending confirmation. If you are not redirected shortly, please check your dashboard.';
+        this.payStatus = '';
         this.paying = false;
     },
 

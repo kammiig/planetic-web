@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
+use App\Services\DNS\CloudflareStatusSync;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -16,14 +17,18 @@ class DomainController extends Controller
         ]);
     }
 
-    public function show(Request $request, Domain $domain): View
+    public function show(Request $request, Domain $domain, CloudflareStatusSync $cloudflareSync): View
     {
         // Ownership: 404 hides existence for non-owners (Security §11.14).
         $this->ownedOrFail($request, $domain);
 
         $domain->load('cloudflareZone');
 
-        return view('customer.domains.show', ['domain' => $domain]);
+        // Pull the latest Cloudflare status when the zone is still pending, so
+        // the dashboard reflects nameserver verification without waiting for cron.
+        $cloudflareSync->refreshIfStale($domain->cloudflareZone);
+
+        return view('customer.domains.show', ['domain' => $domain->fresh('cloudflareZone')]);
     }
 
     public function dns(Request $request, Domain $domain): View

@@ -18,7 +18,7 @@ class HostingAccount extends Model
         'whm_username', 'whm_account_id', 'server_hostname', 'server_ip',
         'cpanel_url', 'status', 'disk_limit_mb', 'bandwidth_limit_mb',
         'created_on_whm_at', 'suspended_at', 'suspension_reason',
-        'renewal_date', 'last_synced_at',
+        'renewal_date', 'auto_renew', 'last_synced_at',
     ];
 
     protected function casts(): array
@@ -30,6 +30,7 @@ class HostingAccount extends Model
             'created_on_whm_at' => 'datetime',
             'suspended_at' => 'datetime',
             'renewal_date' => 'date',
+            'auto_renew' => 'boolean',
             'last_synced_at' => 'datetime',
         ];
     }

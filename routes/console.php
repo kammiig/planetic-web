@@ -20,6 +20,10 @@ Schedule::command('domains:sync')->dailyAt('02:00')->withoutOverlapping();
 // Reconcile hosting account statuses with WHM.
 Schedule::command('hosting:sync')->dailyAt('03:00')->withoutOverlapping();
 
+// Refresh Cloudflare zone DNS/SSL status for zones still pending nameserver
+// verification, so the dashboard flips to "Active" promptly after propagation.
+Schedule::command('cloudflare:sync')->everyFifteenMinutes()->withoutOverlapping();
+
 // Auto-retry transient provisioning failures (never manual-review steps).
 Schedule::command('provisioning:retry-failed')->hourly()->withoutOverlapping();
 

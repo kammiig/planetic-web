@@ -92,6 +92,41 @@ class CloudflareService
         $this->request('delete', "/zones/{$zoneId}/dns_records/{$recordId}", [], 'delete DNS record');
     }
 
+    /**
+     * Read a zone's current state from Cloudflare (status + assigned
+     * nameservers). Used to sync our stored status once the customer points
+     * their registrar nameservers at Cloudflare. Returns null when the zone
+     * cannot be read, so callers can leave the existing status untouched.
+     *
+     * @return array{id: string, name: string, status: string, name_servers: array<int, string>}|null
+     */
+    public function getZone(string $zoneId): ?array
+    {
+        $response = $this->request('get', "/zones/{$zoneId}", [], 'get zone', allowFailure: true);
+
+        if (! ($response['success'] ?? false) || empty($response['result'])) {
+            return null;
+        }
+
+        return $this->normaliseZone($response['result']);
+    }
+
+    /**
+     * Universal SSL certificate status for the zone, e.g. "active",
+     * "pending_validation", "initializing". Returns null when it cannot be
+     * determined (e.g. the zone is not yet active or the call fails).
+     */
+    public function getUniversalSslStatus(string $zoneId): ?string
+    {
+        $response = $this->request('get', "/zones/{$zoneId}/ssl/verification", [], 'get SSL verification', allowFailure: true);
+
+        if (! ($response['success'] ?? false)) {
+            return null;
+        }
+
+        return $response['result'][0]['certificate_status'] ?? null;
+    }
+
     public function setSslMode(string $zoneId, string $mode): void
     {
         $this->request('patch', "/zones/{$zoneId}/settings/ssl", ['value' => $mode], 'set SSL mode');

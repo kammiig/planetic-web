@@ -136,6 +136,9 @@ class StripeService
                 'order_number' => $order->order_number,
             ],
             'automatic_payment_methods' => ['enabled' => true],
+            // Save the card to the customer so it can be shown in Billing and
+            // reused for renewals (off-session), never re-prompting for details.
+            'setup_future_usage' => 'off_session',
         ], [
             'idempotency_key' => 'pi_order_'.$order->id,
         ]);
@@ -149,6 +152,86 @@ class StripeService
     public function minorAmount(float $amount): int
     {
         return (int) round($amount * 100);
+    }
+
+    /**
+     * The customer's saved card, as safe-to-display details only (brand, last
+     * four digits, expiry). Never returns the full number. Returns null when
+     * there is no saved card, no customer, or Stripe is unreachable.
+     *
+     * @return array{brand: string, last4: string, exp_month: int, exp_year: int}|null
+     */
+    public function getDefaultPaymentMethod(User $user): ?array
+    {
+        if (blank(config('stripe.secret_key')) || blank($user->stripe_customer_id)) {
+            return null;
+        }
+
+        try {
+            $client = $this->client();
+            $customer = $client->customers->retrieve(
+                $user->stripe_customer_id,
+                ['expand' => ['invoice_settings.default_payment_method']],
+            );
+
+            $pm = $customer->invoice_settings->default_payment_method ?? null;
+
+            if (! $pm) {
+                $methods = $client->paymentMethods->all([
+                    'customer' => $user->stripe_customer_id,
+                    'type' => 'card',
+                    'limit' => 1,
+                ]);
+                $pm = $methods->data[0] ?? null;
+            }
+
+            if (! $pm || ! isset($pm->card)) {
+                return null;
+            }
+
+            return [
+                'brand' => ucfirst((string) $pm->card->brand),
+                'last4' => (string) $pm->card->last4,
+                'exp_month' => (int) $pm->card->exp_month,
+                'exp_year' => (int) $pm->card->exp_year,
+            ];
+        } catch (\Throwable $e) {
+            Log::channel('stack')->warning('Could not load Stripe payment method.', [
+                'user' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Create a Stripe Billing Portal session so the customer can securely update
+     * their card and view billing history on Stripe's hosted page. Returns the
+     * redirect URL, or null if the portal is not configured / Stripe is down.
+     * (The Billing Portal must be enabled once in the Stripe Dashboard.)
+     */
+    public function createBillingPortalSession(User $user, string $returnUrl): ?string
+    {
+        if (blank(config('stripe.secret_key'))) {
+            return null;
+        }
+
+        try {
+            $session = $this->client()->billingPortal->sessions->create([
+                'customer' => $this->ensureCustomer($user),
+                'return_url' => $returnUrl,
+            ]);
+
+            return $session->url;
+        } catch (\Throwable $e) {
+            Log::channel('stack')->warning('Could not create Stripe billing portal session.', [
+                'user' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**

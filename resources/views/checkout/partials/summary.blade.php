@@ -61,10 +61,13 @@
                 </span>
                 <span x-show="paying" x-cloak class="inline-flex items-center gap-2">
                     <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4z"/></svg>
-                    Processing payment…
+                    <span x-text="payStatus || 'Processing payment…'">Processing payment…</span>
                 </span>
             </button>
-            <p x-show="!paymentReady" class="mt-2 text-center text-xs text-slate-500">Complete the steps to enable payment.</p>
+            <p x-show="paying" x-cloak class="mt-2 text-center text-xs text-slate-500" aria-live="polite">
+                Please don't close or refresh this page — we're preparing your order.
+            </p>
+            <p x-show="!paymentReady && !paying" class="mt-2 text-center text-xs text-slate-500">Complete the steps to enable payment.</p>
         @endif
 
         @if ($freeYearNotice)

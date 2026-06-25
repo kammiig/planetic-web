@@ -22,17 +22,42 @@
             <div class="alert alert-warning mt-4">This account is suspended. {{ $account->suspension_reason }}</div>
         @endif
 
+        @php $zone = $account->domain?->cloudflareZone; @endphp
         <dl class="mt-6 grid gap-4 sm:grid-cols-2">
             <div><dt class="text-sm text-slate-500">Plan</dt><dd class="font-medium">{{ $account->hostingPackage?->name ?? '—' }}</dd></div>
             <div><dt class="text-sm text-slate-500">Username</dt><dd class="font-mono font-medium">{{ $account->whm_username ?? 'Assigned with your domain' }}</dd></div>
-            <div><dt class="text-sm text-slate-500">Cloudflare DNS</dt><dd class="font-medium">{{ $account->domain?->cloudflareZone?->dnsStatusLabel() ?? '—' }}</dd></div>
-            <div><dt class="text-sm text-slate-500">SSL</dt><dd class="font-medium">{{ $account->domain?->cloudflareZone?->sslStatusLabel() ?? '—' }}</dd></div>
+            <div>
+                <dt class="text-sm text-slate-500">Cloudflare DNS</dt>
+                <dd>
+                    @if ($zone)
+                        <span class="badge {{ $zone->isActive() ? 'badge-success' : 'badge-warning' }}"><span class="badge-dot"></span> {{ $zone->dnsStatusLabel() }}</span>
+                    @else — @endif
+                </dd>
+            </div>
+            <div>
+                <dt class="text-sm text-slate-500">Cloudflare SSL</dt>
+                <dd>
+                    @if ($zone)
+                        <span class="badge {{ $zone->sslIsActive() ? 'badge-success' : 'badge-warning' }}"><span class="badge-dot"></span> {{ $zone->sslStatusLabel() }}</span>
+                    @else — @endif
+                </dd>
+            </div>
+            <div>
+                <dt class="text-sm text-slate-500">cPanel AutoSSL</dt>
+                <dd><span class="badge badge-neutral"><span class="badge-dot"></span> Not required</span></dd>
+            </div>
             <div><dt class="text-sm text-slate-500">Server IP</dt><dd class="font-mono font-medium">{{ $account->server_ip ?? '—' }}</dd></div>
             <div><dt class="text-sm text-slate-500">Renewal</dt><dd class="font-medium">{{ $account->renewal_date?->format('j M Y') ?? '—' }}</dd></div>
             @if ($account->disk_limit_mb)
                 <div><dt class="text-sm text-slate-500">Storage</dt><dd class="font-medium">{{ $account->hostingPackage?->diskLabel() ?? ($account->disk_limit_mb.' MB') }}</dd></div>
             @endif
         </dl>
+
+        @if ($zone)
+            <div class="alert alert-info mt-4 text-sm">
+                <strong>Your site's SSL is handled by Cloudflare</strong> at the network edge. cPanel may show its own “AutoSSL” as inactive or display an SSL warning — that's expected and does <em>not</em> affect your visitors, because HTTPS is secured by Cloudflare before traffic reaches the server.
+            </div>
+        @endif
 
         @if ($account->isActive() && $account->whm_username)
             <div class="mt-6">

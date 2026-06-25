@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Customer;
 use App\Enums\HostingStatus;
 use App\Http\Controllers\Controller;
 use App\Models\HostingAccount;
+use App\Services\DNS\CloudflareStatusSync;
 use App\Services\Hosting\WhmService;
 use App\Support\Secrets;
 use Illuminate\Http\RedirectResponse;
@@ -22,13 +23,16 @@ class HostingController extends Controller
         ]);
     }
 
-    public function show(Request $request, HostingAccount $hostingAccount): View
+    public function show(Request $request, HostingAccount $hostingAccount, CloudflareStatusSync $cloudflareSync): View
     {
         abort_unless($hostingAccount->isOwnedBy($request->user()), 404);
 
         $hostingAccount->load('hostingPackage', 'domain.cloudflareZone', 'order.items');
 
-        return view('customer.hosting.show', ['account' => $hostingAccount]);
+        // Refresh Cloudflare DNS/SSL status if still pending verification.
+        $cloudflareSync->refreshIfStale($hostingAccount->domain?->cloudflareZone);
+
+        return view('customer.hosting.show', ['account' => $hostingAccount->fresh(['hostingPackage', 'domain.cloudflareZone', 'order.items'])]);
     }
 
     /**

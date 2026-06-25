@@ -4,8 +4,74 @@
 @section('page-title', 'Billing')
 
 @section('content')
+    {{-- Payment method --}}
+    <section class="grid gap-6 lg:grid-cols-2">
+        <div class="card">
+            <h2 class="text-lg font-bold">Payment method</h2>
+            @if ($paymentMethod)
+                <div class="mt-3 flex items-center gap-3">
+                    <span class="grid h-10 w-14 place-items-center rounded-md border border-slate-200 bg-slate-50 text-[10px] font-bold uppercase text-slate-600">{{ $paymentMethod['brand'] }}</span>
+                    <div>
+                        <p class="font-semibold text-slate-900">{{ $paymentMethod['brand'] }} •••• {{ $paymentMethod['last4'] }}</p>
+                        <p class="text-sm text-slate-500">Expires {{ str_pad((string) $paymentMethod['exp_month'], 2, '0', STR_PAD_LEFT) }}/{{ $paymentMethod['exp_year'] }}</p>
+                    </div>
+                </div>
+            @else
+                <p class="mt-3 text-sm text-slate-500">No saved card yet. Add one for quick, secure renewals.</p>
+            @endif
+            <a href="{{ route('customer.billing.payment-method') }}" class="btn-secondary btn-sm mt-4">
+                {{ $paymentMethod ? 'Update payment method' : 'Add payment method' }}
+            </a>
+            <p class="mt-3 text-xs text-slate-400">Your card is stored securely by Stripe. We never see or store your full card number.</p>
+        </div>
+    </section>
+
+    {{-- Auto-renew controls --}}
+    @if ($renewables->isNotEmpty())
+        <section class="mt-8">
+            <h2 class="text-lg font-bold">Auto-renew</h2>
+            <p class="text-sm text-slate-500">Choose which services renew automatically before they expire.</p>
+            <div class="table-wrap mt-3">
+                <table class="table-base">
+                    <caption class="sr-only">Your renewable services</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Service</th>
+                            <th scope="col">Next renewal</th>
+                            <th scope="col">Renewal amount</th>
+                            <th scope="col">Auto-renew</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($renewables as $r)
+                            <tr>
+                                <td>
+                                    <span class="font-medium text-slate-900">{{ $r['label'] }}</span>
+                                    <span class="block text-xs text-slate-500">{{ $r['sub_label'] }}</span>
+                                </td>
+                                <td>{{ $r['renewal_date']?->format('j M Y') ?? '—' }}</td>
+                                <td>£{{ number_format($r['amount'], 2) }}<span class="text-slate-500">{{ $r['cycle'] }}</span></td>
+                                <td>
+                                    <form method="POST" action="{{ $r['toggle_url'] }}" class="flex items-center gap-2">
+                                        @csrf
+                                        <button type="submit" role="switch" aria-checked="{{ $r['auto_renew'] ? 'true' : 'false' }}"
+                                                aria-label="Toggle auto-renew for {{ $r['label'] }}"
+                                                class="inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition {{ $r['auto_renew'] ? 'bg-success' : 'bg-slate-300' }}">
+                                            <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition {{ $r['auto_renew'] ? 'translate-x-5' : 'translate-x-0.5' }}"></span>
+                                        </button>
+                                        <span class="text-sm font-medium {{ $r['auto_renew'] ? 'text-success' : 'text-slate-500' }}">{{ $r['auto_renew'] ? 'On' : 'Off' }}</span>
+                                    </form>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    @endif
+
     {{-- Invoices --}}
-    <section>
+    <section class="mt-8">
         <h2 class="text-lg font-bold">Invoices</h2>
         @if ($invoices->isEmpty())
             <div class="card mt-3 text-center text-slate-500">

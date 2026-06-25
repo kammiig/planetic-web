@@ -13,7 +13,7 @@ class CloudflareZone extends Model
 
     protected $fillable = [
         'user_id', 'domain_id', 'zone_id', 'zone_name', 'status',
-        'name_servers', 'ssl_mode', 'always_use_https',
+        'name_servers', 'ssl_mode', 'ssl_status', 'always_use_https',
         'created_on_cloudflare_at', 'last_synced_at',
     ];
 
@@ -45,6 +45,16 @@ class CloudflareZone extends Model
         return $this->status === 'active';
     }
 
+    /**
+     * Whether Cloudflare's Universal SSL certificate is issued and active.
+     * An active zone has Universal SSL provisioned by default, so we treat an
+     * active zone as SSL-active even before the verification call confirms it.
+     */
+    public function sslIsActive(): bool
+    {
+        return $this->ssl_status === 'active' || ($this->isActive() && $this->ssl_status === null);
+    }
+
     /** Customer-facing DNS status. */
     public function dnsStatusLabel(): string
     {
@@ -56,16 +66,22 @@ class CloudflareZone extends Model
     /**
      * Customer-facing SSL status. Cloudflare cannot issue the edge certificate
      * until the domain's nameservers point at Cloudflare, so an unverified zone
-     * shows "waiting" rather than a scary failed state.
+     * shows "waiting" rather than a scary failed state. Once the zone is active,
+     * Universal SSL is reported as active.
      */
     public function sslStatusLabel(): string
     {
+        if ($this->sslIsActive()) {
+            $mode = ucfirst((string) ($this->ssl_mode ?: 'full'));
+
+            return "Active ({$mode})";
+        }
+
         if (! $this->isActive()) {
             return 'Waiting for nameserver verification';
         }
 
-        $mode = ucfirst((string) ($this->ssl_mode ?: 'full'));
-
-        return "Active ({$mode})";
+        // Zone is active but Cloudflare is still issuing the certificate.
+        return 'Securing (issuing certificate)';
     }
 }
