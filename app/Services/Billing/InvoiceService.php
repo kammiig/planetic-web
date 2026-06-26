@@ -66,6 +66,28 @@ class InvoiceService
     }
 
     /**
+     * Record a £0 / free order in the payment ledger. No money changes hands,
+     * so there is no Stripe charge — the row exists purely for the customer's
+     * billing history and admin reporting.
+     */
+    public function recordFreeOrder(Order $order): Payment
+    {
+        return Payment::updateOrCreate(
+            ['provider_payment_id' => 'free-'.$order->id],
+            [
+                'user_id' => $order->user_id,
+                'order_id' => $order->id,
+                'invoice_id' => $order->invoice()->value('id'),
+                'provider' => 'none',
+                'amount' => $order->total,
+                'currency' => $order->currency,
+                'status' => PaymentStatus::NoPaymentRequired->value,
+                'paid_at' => now(),
+            ],
+        );
+    }
+
+    /**
      * Record a failed payment attempt with its (internal) reason.
      */
     public function recordFailedPayment(Order $order, ?string $providerPaymentId, ?string $reason = null): Payment

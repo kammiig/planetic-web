@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Stripe\Checkout\Session;
 use Stripe\Event;
 use Stripe\PaymentIntent;
+use Stripe\SetupIntent;
 use Stripe\StripeClient;
 use Stripe\Webhook;
 
@@ -152,6 +153,52 @@ class StripeService
     public function minorAmount(float $amount): int
     {
         return (int) round($amount * 100);
+    }
+
+    /**
+     * Create a SetupIntent so a card can be collected and saved for FUTURE
+     * off-session charges (renewals) WITHOUT taking a payment now. Used for free
+     * (£0) orders when the platform is configured to require a card on file —
+     * Stripe forbids a £0 PaymentIntent, so a SetupIntent is the correct tool.
+     */
+    public function createSetupIntent(Order $order): SetupIntent
+    {
+        return $this->client()->setupIntents->create([
+            'customer' => $this->ensureCustomer($order->user),
+            'usage' => 'off_session',
+            'automatic_payment_methods' => ['enabled' => true],
+            'metadata' => [
+                'order_id' => (string) $order->id,
+                'order_number' => $order->order_number,
+            ],
+        ], [
+            'idempotency_key' => 'si_order_'.$order->id,
+        ]);
+    }
+
+    /** Whether the customer already has a saved card on file. */
+    public function hasSavedCard(User $user): bool
+    {
+        return $this->getDefaultPaymentMethod($user) !== null;
+    }
+
+    /** Set a freshly-saved payment method as the customer's default (best-effort). */
+    public function setDefaultPaymentMethod(User $user, string $paymentMethodId): void
+    {
+        if (blank(config('stripe.secret_key')) || blank($user->stripe_customer_id)) {
+            return;
+        }
+
+        try {
+            $this->client()->customers->update($user->stripe_customer_id, [
+                'invoice_settings' => ['default_payment_method' => $paymentMethodId],
+            ]);
+        } catch (\Throwable $e) {
+            Log::channel('stack')->warning('Could not set default payment method.', [
+                'user' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

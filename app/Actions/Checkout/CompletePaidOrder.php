@@ -27,9 +27,19 @@ class CompletePaidOrder
     public function __construct(private readonly InvoiceService $invoices) {}
 
     /**
+     * Complete a £0 / free order: no Stripe charge is taken, but the order is
+     * marked as requiring no payment and provisioning runs exactly as for a
+     * paid order. Used for free first-year hosting + free domain bundles.
+     */
+    public function handleFree(Order $order): void
+    {
+        $this->handle($order, free: true);
+    }
+
+    /**
      * @param  array{session_id?: string, payment_intent?: string, customer?: string, stripe_invoice_id?: string}  $context
      */
-    public function handle(Order $order, array $context = []): void
+    public function handle(Order $order, array $context = [], bool $free = false): void
     {
         // Already processed — do not provision twice.
         if ($order->isPaid()) {
@@ -38,7 +48,7 @@ class CompletePaidOrder
 
         // The webhook, the success page and the scheduled sweep may all detect
         // the same payment at once; the row lock makes exactly one of them win.
-        $proceed = DB::transaction(function () use ($order, $context) {
+        $proceed = DB::transaction(function () use ($order, $context, $free) {
             $current = Order::whereKey($order->id)->lockForUpdate()->first();
 
             if (! $current || $current->isPaid()) {
@@ -47,7 +57,7 @@ class CompletePaidOrder
 
             $order->forceFill([
                 'status' => OrderStatus::Provisioning->value,
-                'payment_status' => PaymentStatus::Succeeded->value,
+                'payment_status' => ($free ? PaymentStatus::NoPaymentRequired : PaymentStatus::Succeeded)->value,
                 'paid_at' => now(),
                 'stripe_checkout_session_id' => $context['session_id'] ?? $order->stripe_checkout_session_id,
                 'stripe_payment_intent_id' => $context['payment_intent'] ?? $order->stripe_payment_intent_id,
@@ -55,7 +65,9 @@ class CompletePaidOrder
 
             $this->invoices->createForOrder($order, $context['stripe_invoice_id'] ?? null);
 
-            if (! empty($context['payment_intent'])) {
+            if ($free) {
+                $this->invoices->recordFreeOrder($order);
+            } elseif (! empty($context['payment_intent'])) {
                 $this->invoices->recordSuccessfulPayment($order, $context['payment_intent'], $context['customer'] ?? null);
             }
 

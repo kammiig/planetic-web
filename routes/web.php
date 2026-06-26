@@ -73,6 +73,12 @@ Route::prefix('checkout')->name('checkout.')->group(function () {
         ->middleware(['auth', 'throttle:10,1'])
         ->name('payment-intent');
 
+    // Free (£0) orders: completed without Stripe (no PaymentIntent), provisioning
+    // starts immediately. Used for free first-year hosting + free domain bundles.
+    Route::post('/complete-free', [CheckoutController::class, 'completeFree'])
+        ->middleware(['auth', 'throttle:10,1'])
+        ->name('complete-free');
+
     Route::get('/success', [CheckoutController::class, 'success'])->name('success');
     Route::get('/cancel', [CheckoutController::class, 'cancel'])->name('cancel');
 });

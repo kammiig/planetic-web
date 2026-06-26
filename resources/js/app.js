@@ -22,9 +22,11 @@ Alpine.data('checkout', (config = {}) => ({
     steps: config.steps || ['review', 'billing', 'payment'],
     step: 0,
     intentUrl: config.intentUrl,
+    freeUrl: config.freeUrl || '',
     successUrl: config.successUrl,
     domainUrl: config.domainUrl || '',
     searchUrl: config.searchUrl || '',
+    total: Number(config.total || 0),
     publishableKey: config.publishableKey || '',
     stripe: null,
     elements: null,
@@ -34,6 +36,7 @@ Alpine.data('checkout', (config = {}) => ({
     paying: false,
     payStatus: '',
     paymentReady: false,
+    setupMode: false,
     formError: '',
     fieldErrors: {},
 
@@ -56,6 +59,9 @@ Alpine.data('checkout', (config = {}) => ({
 
     get currentStep() {
         return this.steps[this.step];
+    },
+    get isFree() {
+        return Number(this.total) <= 0;
     },
     isActive(name) {
         return this.currentStep === name;
@@ -198,6 +204,11 @@ Alpine.data('checkout', (config = {}) => ({
 
     /** Billing → Payment: validate server-side, create the intent, mount the element. */
     async continueToPayment() {
+        // Free (£0) orders skip Stripe entirely — Stripe rejects a £0 charge.
+        if (this.isFree) {
+            return this.completeFreeOrder();
+        }
+
         this.formError = '';
         this.fieldErrors = {};
         this.initialising = true;
@@ -276,8 +287,119 @@ Alpine.data('checkout', (config = {}) => ({
         this.paymentReady = true;
     },
 
+    /**
+     * Complete a free (£0) order without Stripe. Provisioning starts immediately
+     * server-side; we then redirect to the success page. Double-submit guarded.
+     */
+    async completeFreeOrder(paymentMethodId = null) {
+        if (this.paying || this.initialising) {
+            return;
+        }
+        this.formError = '';
+        this.fieldErrors = {};
+        this.paying = true;
+        this.payStatus = 'Completing your order…';
+
+        const body = new FormData(this.$refs.billingForm);
+        if (paymentMethodId) {
+            body.append('payment_method', paymentMethodId);
+        }
+
+        try {
+            const response = await fetch(this.freeUrl, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': this.csrfToken(), Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body,
+            });
+
+            if (response.status === 422) {
+                const data = await response.json();
+                this.fieldErrors = data.errors || {};
+                this.formError = data.message || data.error || 'Please check the highlighted fields and try again.';
+                this.payStatus = '';
+                this.paying = false;
+                this.focusFirstError();
+                return;
+            }
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                this.formError = data.error || 'We could not place your order right now. Please try again in a moment.';
+                this.payStatus = '';
+                this.paying = false;
+                return;
+            }
+
+            const data = await response.json();
+
+            // Card-on-file required first: collect it with a SetupIntent (no charge).
+            if (data.setup_required) {
+                this.clientSecret = data.client_secret;
+                if (data.publishable_key) {
+                    this.publishableKey = data.publishable_key;
+                }
+                this.setupMode = true;
+                this.payStatus = '';
+                this.paying = false;
+                await this.mountPaymentElement();
+                this.next();
+                return;
+            }
+
+            if (data.ok && data.redirect) {
+                this.payStatus = 'Setting up your domain and hosting…';
+                window.location.assign(data.redirect);
+                return;
+            }
+
+            this.formError = 'We could not place your order. Please try again.';
+            this.payStatus = '';
+            this.paying = false;
+        } catch (error) {
+            this.formError = 'Network error — please check your connection and try again.';
+            this.payStatus = '';
+            this.paying = false;
+        }
+    },
+
+    /** Free order that requires a saved card: confirm the SetupIntent, then complete. */
+    async confirmSetupThenComplete() {
+        if (this.paying) {
+            return;
+        }
+        this.paying = true;
+        this.formError = '';
+        this.payStatus = 'Saving your card…';
+
+        const { error, setupIntent } = await this.stripe.confirmSetup({
+            elements: this.elements,
+            confirmParams: { return_url: this.successUrl },
+            redirect: 'if_required',
+        });
+
+        if (error) {
+            this.formError = error.message || 'We could not save your card. Please check your details and try again.';
+            this.payStatus = '';
+            this.paying = false;
+            return;
+        }
+
+        if (setupIntent && setupIntent.status === 'succeeded') {
+            this.paying = false; // completeFreeOrder re-enters the loading state
+            return this.completeFreeOrder(setupIntent.payment_method);
+        }
+
+        this.formError = 'Your card setup is pending. Please try again in a moment.';
+        this.payStatus = '';
+        this.paying = false;
+    },
+
     /** Confirm payment on-site. redirect:'if_required' keeps simple cards on-page. */
     async pay() {
+        // Free order requiring a card on file: confirm the SetupIntent instead.
+        if (this.setupMode) {
+            return this.confirmSetupThenComplete();
+        }
         // Guard against double-clicks so we never create a duplicate charge/order.
         if (this.paying) {
             return;

@@ -2,12 +2,14 @@
 
 @php
     use App\Enums\OrderStatus;
+    use App\Enums\PaymentStatus;
     $redirectStatus = request()->query('redirect_status');
     $failed = $redirectStatus === 'failed' || ($order && $order->status === OrderStatus::Failed);
     $settling = ! $failed && $order && in_array($order->status, [OrderStatus::Pending, OrderStatus::Provisioning], true);
+    $free = $order && ($order->payment_status === PaymentStatus::NoPaymentRequired || (float) $order->total <= 0.0);
 @endphp
 
-@section('title', $failed ? 'Payment not completed' : 'Payment received')
+@section('title', $failed ? 'Order not completed' : ($free ? 'Free order placed' : 'Payment received'))
 
 @push('head')
     <meta name="robots" content="noindex,nofollow">
@@ -36,12 +38,17 @@
                 <span class="mx-auto grid h-16 w-16 place-items-center rounded-full bg-success/10 text-success" aria-hidden="true">
                     <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
                 </span>
-                <h1 class="mt-6 text-3xl font-bold">Thank you — your payment is confirmed</h1>
+                <h1 class="mt-6 text-3xl font-bold">{{ $free ? 'Your free order has been placed' : 'Thank you — your payment is confirmed' }}</h1>
 
                 @if ($order)
                     <p class="mt-3 text-slate-600">
-                        Order <span class="font-semibold">{{ $order->order_number }}</span>. We're setting up your services now.
-                        You'll receive an email shortly and can track progress in your dashboard.
+                        @if ($free)
+                            Order <span class="font-semibold">{{ $order->order_number }}</span> — no payment was required.
+                            We're setting up your domain and hosting now. You'll receive an email shortly and can track progress in your dashboard.
+                        @else
+                            Order <span class="font-semibold">{{ $order->order_number }}</span>. We're setting up your services now.
+                            You'll receive an email shortly and can track progress in your dashboard.
+                        @endif
                     </p>
                     <div class="mt-4 flex justify-center">
                         <x-status-badge :status="$order->status" />

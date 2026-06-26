@@ -80,6 +80,9 @@ class SiteSettingSeeder extends Seeder
             // ---- Footer / company ----
             ['group' => 'footer', 'key' => 'footer.tagline', 'type' => 'textarea', 'label' => 'Footer tagline', 'value' => 'Domains, hosting, DNS and bespoke websites — built, secured and managed for you.'],
             ['group' => 'footer', 'key' => 'company.name', 'label' => 'Company name', 'value' => 'Planetic Web'],
+
+            // ---- Checkout ----
+            ['group' => 'checkout', 'key' => 'checkout.require_card_for_free_orders', 'type' => 'boolean', 'label' => 'Require a card on free (£0) orders', 'help' => 'When on, customers placing a free first-year order must save a card (via Stripe SetupIntent) for future renewals. When off, free orders complete without a card.', 'value' => '0'],
         ];
     }
 }

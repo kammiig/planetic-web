@@ -8,6 +8,7 @@ enum PaymentStatus: string implements \Filament\Support\Contracts\HasColor, \Fil
 
     case Pending = 'pending';
     case Succeeded = 'succeeded';
+    case NoPaymentRequired = 'no_payment_required';
     case Failed = 'failed';
     case Refunded = 'refunded';
     case PartiallyRefunded = 'partially_refunded';
@@ -18,6 +19,7 @@ enum PaymentStatus: string implements \Filament\Support\Contracts\HasColor, \Fil
         return match ($this) {
             self::Pending => 'Pending',
             self::Succeeded => 'Succeeded',
+            self::NoPaymentRequired => 'Free (no payment required)',
             self::Failed => 'Failed',
             self::Refunded => 'Refunded',
             self::PartiallyRefunded => 'Partially Refunded',
@@ -28,7 +30,7 @@ enum PaymentStatus: string implements \Filament\Support\Contracts\HasColor, \Fil
     public function badgeClass(): string
     {
         return match ($this) {
-            self::Succeeded => 'badge-success',
+            self::Succeeded, self::NoPaymentRequired => 'badge-success',
             self::Pending => 'badge-warning',
             self::Failed, self::Cancelled => 'badge-danger',
             self::Refunded, self::PartiallyRefunded => 'badge-info',

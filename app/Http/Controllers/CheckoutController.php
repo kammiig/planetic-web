@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Checkout\CompletePaidOrder;
 use App\Actions\Checkout\ConfirmOrderPayment;
 use App\Actions\Orders\CreateOrderFromCart;
 use App\Enums\OrderStatus;
@@ -122,6 +123,82 @@ class CheckoutController extends Controller
     }
 
     /**
+     * AJAX: complete a £0 / free order WITHOUT Stripe. Stripe rejects a £0
+     * PaymentIntent, so free first-year bundles are confirmed here directly:
+     * the order is marked as requiring no payment and provisioning starts
+     * immediately (register domain, create hosting, Cloudflare zone/DNS, email).
+     * When the platform is configured to require a card for renewals, a Stripe
+     * SetupIntent is used to save the card first (never a charge).
+     */
+    public function completeFree(CheckoutRequest $request, CreateOrderFromCart $createOrder, CompletePaidOrder $complete, StripeService $stripe): JsonResponse
+    {
+        $cart = $this->cart->currentCart()->load('items.product.hostingPackage');
+
+        if ($cart->items->isNotEmpty() && ($error = $this->cart->domainRequirementError($cart))) {
+            return response()->json(['error' => $error], 422);
+        }
+
+        $request->user()->update($request->billingData());
+
+        $order = $this->resolveCheckoutOrder($request, $createOrder);
+
+        if (! $order) {
+            return response()->json(['error' => 'Your cart is empty. Please add a product before placing your order.'], 422);
+        }
+
+        // Safety net: never complete a payable order for free.
+        if ((float) $order->total > 0.0) {
+            return response()->json(['error' => 'This order requires payment.'], 422);
+        }
+
+        // Optionally require a saved card (for future renewals) before completing.
+        if (setting('checkout.require_card_for_free_orders', false)) {
+            if ($paymentMethod = $request->input('payment_method')) {
+                // Card was just saved via a SetupIntent on the client.
+                $stripe->setDefaultPaymentMethod($request->user(), $paymentMethod);
+            } elseif (! $stripe->hasSavedCard($request->user())) {
+                try {
+                    $setup = $stripe->createSetupIntent($order);
+                } catch (Throwable $e) {
+                    Log::channel('stack')->error('Stripe SetupIntent creation failed', [
+                        'order' => $order->order_number,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    return response()->json(['error' => 'We could not start card setup right now. Please try again in a few moments.'], 502);
+                }
+
+                return response()->json([
+                    'setup_required' => true,
+                    'client_secret' => $setup->client_secret,
+                    'publishable_key' => (string) config('stripe.public_key'),
+                    'order_number' => $order->order_number,
+                ]);
+            }
+        }
+
+        try {
+            $complete->handleFree($order);
+        } catch (Throwable $e) {
+            Log::channel('stack')->error('Free order completion failed', [
+                'order' => $order->order_number,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['error' => 'We could not place your order right now. Please try again in a few moments.'], 502);
+        }
+
+        $request->session()->forget('checkout_order_id');
+
+        return response()->json([
+            'ok' => true,
+            'free' => true,
+            'order_number' => $order->order_number,
+            'redirect' => route('checkout.success').'?order='.urlencode($order->order_number),
+        ]);
+    }
+
+    /**
      * Confirmation page. The browser's redirect is never trusted: when the
      * order is still unpaid we ask Stripe directly (server-to-server) whether
      * the charge succeeded, and only then complete the order. Idempotent with
@@ -211,6 +288,13 @@ class CheckoutController extends Controller
     private function locateOrderForConfirmation(Request $request): ?Order
     {
         $userId = $request->user()?->id;
+
+        // Free (£0) orders are completed server-side and carry their order number.
+        if ($orderNumber = $request->query('order')) {
+            return Order::where('order_number', $orderNumber)
+                ->when($userId, fn ($q) => $q->where('user_id', $userId))
+                ->first();
+        }
 
         if ($paymentIntent = $request->query('payment_intent')) {
             return Order::where('stripe_payment_intent_id', $paymentIntent)

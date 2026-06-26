@@ -135,9 +135,11 @@
                     <div
                         x-data="checkout(@js([
                             'intentUrl' => route('checkout.payment-intent'),
+                            'freeUrl' => route('checkout.complete-free'),
                             'successUrl' => route('checkout.success'),
                             'domainUrl' => route('checkout.domain'),
                             'searchUrl' => route('domains.search'),
+                            'total' => (float) $total,
                             'publishableKey' => $publishableKey,
                             'steps' => $needsDomain ? ['domain', 'review', 'billing', 'payment'] : ['review', 'billing', 'payment'],
                             'domainChoice' => $domainChoice,
@@ -349,11 +351,14 @@
 
                                         <div class="flex items-center justify-between pt-2">
                                             <button type="button" @click="back()" class="btn-secondary">Back</button>
-                                            <button type="submit" class="btn-primary" x-bind:disabled="initialising">
-                                                <span x-show="!initialising">Continue to payment</span>
-                                                <span x-show="initialising" x-cloak class="inline-flex items-center gap-2">
+                                            <button type="submit" class="btn-primary" x-bind:disabled="initialising || paying">
+                                                <span x-show="!initialising && !paying">
+                                                    <span x-show="!isFree">Continue to payment</span>
+                                                    <span x-show="isFree" x-cloak>Complete order</span>
+                                                </span>
+                                                <span x-show="initialising || paying" x-cloak class="inline-flex items-center gap-2">
                                                     <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4z"/></svg>
-                                                    Starting secure payment…
+                                                    <span x-text="payStatus || (isFree ? 'Completing your order…' : 'Starting secure payment…')"></span>
                                                 </span>
                                             </button>
                                         </div>
