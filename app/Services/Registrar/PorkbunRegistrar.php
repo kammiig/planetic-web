@@ -66,11 +66,16 @@ class PorkbunRegistrar implements RegistrarInterface
         $domain = strtolower($data['domain']);
         $dryRun = (bool) ($data['dry_run'] ?? false);
 
-        // Confirm availability and obtain the exact price Porkbun expects. The
-        // create call rejects a mismatched cost, so we send the live figure.
-        $check = $this->checkAvailability($domain);
+        // Obtain the exact price Porkbun expects (it rejects a mismatched cost).
+        // Porkbun's /domain/checkDomain is heavily rate-limited (≈1 request per
+        // 10 seconds); on a free order, provisioning runs moments after the
+        // customer's domain search, so a re-check here can fail with HTTP 400
+        // "RATE_LIMIT_EXCEEDED". When that happens we price via the public,
+        // NON-rate-limited /pricing/get and proceed — the domain was already
+        // confirmed available at checkout and Porkbun's create call validates.
+        [$available, $priceUsd] = $this->availabilityAndPrice($domain);
 
-        if (! $dryRun && ! $check['available']) {
+        if (! $dryRun && $available === false) {
             throw new RegistrarException(
                 "Porkbun reports {$domain} is not available to register.",
                 safeMessage: 'That domain is no longer available. Please choose another.',
@@ -79,7 +84,7 @@ class PorkbunRegistrar implements RegistrarInterface
         }
 
         $payload = [
-            'cost' => (int) round(((float) ($check['price'] ?? 0)) * 100), // pennies
+            'cost' => (int) round(((float) $priceUsd) * 100), // US cents
             'agreeToTerms' => 'yes',
             'whoisPrivacy' => ! empty($data['whois_privacy']) ? 'yes' : 'no',
         ];
@@ -105,6 +110,52 @@ class PorkbunRegistrar implements RegistrarInterface
             'order_amount' => isset($reply['cost']) ? (string) $reply['cost'] : null,
             'expiry_date' => $dryRun ? null : $this->lookupExpiry($domain),
         ];
+    }
+
+    /**
+     * Availability + USD price for a registration. Prefers a live availability
+     * check, but Porkbun's checkDomain is rate-limited (≈1/10s); on a rate-limit
+     * it falls back to the non-rate-limited /pricing/get and returns availability
+     * as "unknown" (null) so registration is never blocked by the rate limit —
+     * Porkbun's create call is the final arbiter of availability.
+     *
+     * @return array{0: bool|null, 1: float|string}
+     */
+    private function availabilityAndPrice(string $domain): array
+    {
+        try {
+            $check = $this->checkAvailability($domain);
+
+            return [(bool) $check['available'], $check['price'] ?? 0];
+        } catch (RegistrarException $e) {
+            if (! $this->isRateLimited($e)) {
+                throw $e;
+            }
+
+            Log::channel('stack')->info('Porkbun checkDomain rate-limited during registration — pricing via /pricing/get instead.', [
+                'domain' => $domain,
+            ]);
+
+            // Pass the FULL domain so getPricing()'s internal tldOf() extracts the
+            // correct multi-part TLD (e.g. "co.uk", not "uk").
+            $pricing = $this->getPricing($domain);
+
+            return [null, $pricing['registration'] ?? 0];
+        }
+    }
+
+    /** Whether a registrar error was Porkbun's rate limit (transient). */
+    private function isRateLimited(RegistrarException $e): bool
+    {
+        if (is_array($e->context) && strtoupper((string) ($e->context['code'] ?? '')) === 'RATE_LIMIT_EXCEEDED') {
+            return true;
+        }
+
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'rate limit')
+            || str_contains($message, 'rate_limit')
+            || str_contains($message, 'checks within');
     }
 
     public function renewDomain(string $domain, int $years = 1): array

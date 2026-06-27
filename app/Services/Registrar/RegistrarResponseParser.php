@@ -172,6 +172,8 @@ class RegistrarResponseParser
             || str_contains($message, 'state') || str_contains($message, 'country');
 
         return match (true) {
+            str_contains($message, 'rate limit') || str_contains($message, 'rate_limit') || str_contains($message, 'checks within') || str_contains($message, 'too many')
+                => 'Porkbun rate-limited the request (its domain availability checks allow roughly one every 10 seconds). This is transient — registration now prices via the non-rate-limited pricing endpoint, so just retry the step in a few seconds.',
             str_contains($message, 'api key') || str_contains($message, 'credential') || str_contains($message, 'invalid key')
                 => 'Check PORKBUN_API_KEY / PORKBUN_SECRET_KEY in the server .env — Porkbun rejected the credentials.',
             str_contains($message, 'balance') || str_contains($message, 'fund') || str_contains($message, 'insufficient')
