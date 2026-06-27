@@ -197,6 +197,26 @@ class OrdersProvisionCommand extends Command
             ['Hosting', $order->hostingAccount ? "{$order->hostingAccount->whm_username} ({$order->hostingAccount->status->value})" : '—'],
             ['Website project', $order->websiteProject ? "{$order->websiteProject->project_number} ({$order->websiteProject->status->value})" : '—'],
         ]);
+
+        // Surface the exact reason for any failed/manual-review step, so the
+        // operator sees WHY without needing a separate command.
+        $failed = $order->provisioningJobs()
+            ->whereIn('status', [
+                ProvisioningStatus::Failed->value,
+                ProvisioningStatus::ManualReview->value,
+            ])
+            ->orderByDesc('updated_at')
+            ->first();
+
+        if ($failed && filled($failed->error_message)) {
+            $this->newLine();
+            $this->error("Last failure — step \"{$failed->job_type->value}\":");
+            $this->line('  '.$failed->error_message);
+
+            if (filled($failed->response_payload)) {
+                $this->line('  Registrar/response detail: '.json_encode($failed->response_payload, JSON_UNESCAPED_SLASHES));
+            }
+        }
     }
 
     private function resolveOrders(): Collection

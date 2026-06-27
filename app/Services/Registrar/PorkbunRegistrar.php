@@ -5,6 +5,7 @@ namespace App\Services\Registrar;
 use App\Exceptions\RegistrarException;
 use App\Support\DomainName;
 use App\Support\Secrets;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -34,9 +35,17 @@ class PorkbunRegistrar implements RegistrarInterface
     public function checkAvailability(string $domain): array
     {
         $domain = strtolower($domain);
-        $json = $this->command('/domain/checkDomain/'.$domain, [], 'availability check');
 
-        return $this->parser->porkbunAvailability($json, $domain);
+        // Cache the result briefly. Porkbun's checkDomain is rate-limited to
+        // ≈1 request / 10s, so when a free order provisions seconds after the
+        // customer's domain search the registration reuses the search's result
+        // instead of making a second (rate-limited) call — and the price stays
+        // the genuine checkDomain quote that the create call requires.
+        return Cache::remember('porkbun-availability:'.$domain, now()->addMinutes(5), function () use ($domain) {
+            $json = $this->command('/domain/checkDomain/'.$domain, [], 'availability check');
+
+            return $this->parser->porkbunAvailability($json, $domain);
+        });
     }
 
     public function getPricing(string $tld): array
@@ -134,10 +143,10 @@ class PorkbunRegistrar implements RegistrarInterface
 
             // checkDomain is the AUTHORITATIVE price source — Porkbun's create
             // rejects a cost that doesn't match its checkDomain quote, so we must
-            // not price from a different endpoint. Instead, wait out the short
-            // rate-limit window (Porkbun reports ttlRemaining seconds) and
-            // re-check once to obtain the exact quote.
-            $wait = $this->rateLimitWaitSeconds($e);
+            // not price from a different endpoint. Wait out the FULL rate-limit
+            // window (Porkbun states "within 10 seconds"; its ttlRemaining can be
+            // misleadingly small) and re-check once to obtain the exact quote.
+            $wait = max(0, (int) config('domain.rate_limit_retry_seconds', 11));
             Log::channel('stack')->info("Porkbun checkDomain rate-limited; waiting {$wait}s then retrying for the exact quote.", [
                 'domain' => $domain,
             ]);
@@ -152,20 +161,6 @@ class PorkbunRegistrar implements RegistrarInterface
 
             return [(bool) $check['available'], $check['price'] ?? 0];
         }
-    }
-
-    /** Seconds to wait before retrying a rate-limited checkDomain (0 disables). */
-    private function rateLimitWaitSeconds(RegistrarException $e): int
-    {
-        $max = (int) config('domain.rate_limit_retry_seconds', 11);
-
-        if ($max <= 0) {
-            return 0; // disabled (e.g. in tests)
-        }
-
-        $ttl = is_array($e->context) ? (int) ($e->context['ttlRemaining'] ?? 0) : 0;
-
-        return max(1, min($ttl > 0 ? $ttl + 1 : $max, $max));
     }
 
     /** Whether a registrar error was Porkbun's rate limit (transient). */
