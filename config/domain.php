@@ -100,6 +100,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Porkbun checkDomain rate-limit retry
+    |--------------------------------------------------------------------------
+    |
+    | Porkbun's /domain/checkDomain endpoint is rate-limited (≈1 request / 10s).
+    | When a registration's availability/price check is rate-limited, the
+    | registrar waits this many seconds (capped) and re-checks once to get the
+    | exact quote Porkbun's create call requires. Set to 0 to disable the wait.
+    |
+    */
+
+    'rate_limit_retry_seconds' => (int) env('PORKBUN_RATE_LIMIT_RETRY_SECONDS', 11),
+
+    /*
+    |--------------------------------------------------------------------------
     | USD → GBP conversion (admin reference only)
     |--------------------------------------------------------------------------
     |

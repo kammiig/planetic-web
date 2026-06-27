@@ -132,16 +132,40 @@ class PorkbunRegistrar implements RegistrarInterface
                 throw $e;
             }
 
-            Log::channel('stack')->info('Porkbun checkDomain rate-limited during registration — pricing via /pricing/get instead.', [
+            // checkDomain is the AUTHORITATIVE price source — Porkbun's create
+            // rejects a cost that doesn't match its checkDomain quote, so we must
+            // not price from a different endpoint. Instead, wait out the short
+            // rate-limit window (Porkbun reports ttlRemaining seconds) and
+            // re-check once to obtain the exact quote.
+            $wait = $this->rateLimitWaitSeconds($e);
+            Log::channel('stack')->info("Porkbun checkDomain rate-limited; waiting {$wait}s then retrying for the exact quote.", [
                 'domain' => $domain,
             ]);
 
-            // Pass the FULL domain so getPricing()'s internal tldOf() extracts the
-            // correct multi-part TLD (e.g. "co.uk", not "uk").
-            $pricing = $this->getPricing($domain);
+            if ($wait > 0) {
+                sleep($wait);
+            }
 
-            return [null, $pricing['registration'] ?? 0];
+            // If it is still rate-limited, the exception propagates and the step
+            // fails for manual review — the admin can simply retry.
+            $check = $this->checkAvailability($domain);
+
+            return [(bool) $check['available'], $check['price'] ?? 0];
         }
+    }
+
+    /** Seconds to wait before retrying a rate-limited checkDomain (0 disables). */
+    private function rateLimitWaitSeconds(RegistrarException $e): int
+    {
+        $max = (int) config('domain.rate_limit_retry_seconds', 11);
+
+        if ($max <= 0) {
+            return 0; // disabled (e.g. in tests)
+        }
+
+        $ttl = is_array($e->context) ? (int) ($e->context['ttlRemaining'] ?? 0) : 0;
+
+        return max(1, min($ttl > 0 ? $ttl + 1 : $max, $max));
     }
 
     /** Whether a registrar error was Porkbun's rate limit (transient). */

@@ -191,20 +191,16 @@ class PorkbunRegistrarTest extends TestCase
         $this->assertArrayHasKey('registration_requirements', $report);
     }
 
-    public function test_registration_proceeds_when_checkdomain_is_rate_limited(): void
+    public function test_registration_waits_out_a_rate_limit_then_uses_the_exact_quote(): void
     {
+        // Disable the real sleep so the test runs instantly.
+        config()->set('domain.rate_limit_retry_seconds', 0);
+
         Http::fake([
-            // checkDomain is rate-limited (HTTP 400 RATE_LIMIT_EXCEEDED)...
-            'api.porkbun.com/api/json/v3/domain/checkDomain/*' => Http::response([
-                'status' => 'ERROR',
-                'code' => 'RATE_LIMIT_EXCEEDED',
-                'message' => '1 out of 1 checks within 10 seconds used.',
-            ], 400),
-            // ...but /pricing/get is not, so registration prices from there.
-            'api.porkbun.com/api/json/v3/pricing/get*' => Http::response([
-                'status' => 'SUCCESS',
-                'pricing' => ['co.uk' => ['registration' => '5.66', 'renewal' => '8.99', 'transfer' => '8.99']],
-            ]),
+            // First checkDomain is rate-limited; the retry succeeds with the quote.
+            'api.porkbun.com/api/json/v3/domain/checkDomain/*' => Http::sequence()
+                ->push(['status' => 'ERROR', 'code' => 'RATE_LIMIT_EXCEEDED', 'message' => '1 out of 1 checks within 10 seconds used.', 'ttlRemaining' => 1], 400)
+                ->push(['status' => 'SUCCESS', 'response' => ['avail' => 'yes', 'price' => '5.66', 'premium' => 'no']], 200),
             'api.porkbun.com/api/json/v3/domain/listAll*' => Http::response(['status' => 'SUCCESS', 'domains' => []]),
             'api.porkbun.com/api/json/v3/domain/create/*' => Http::response(['status' => 'SUCCESS', 'orderId' => '999']),
         ]);
@@ -213,8 +209,8 @@ class PorkbunRegistrarTest extends TestCase
 
         $this->assertTrue($result['success']);
 
-        // It proceeded despite the rate limit, pricing the cost (566 US cents)
-        // from /pricing/get rather than the blocked checkDomain endpoint.
+        // The create call used the EXACT checkDomain quote (566 US cents), not a
+        // different price source — so Porkbun never rejects on a cost mismatch.
         Http::assertSent(fn (Request $r) => str_contains($r->url(), '/domain/create/goods-group.co.uk')
             && (int) ($r['cost'] ?? -1) === 566);
     }
