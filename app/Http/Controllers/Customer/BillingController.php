@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Customer;
 
+use App\Enums\DomainStatus;
+use App\Enums\HostingStatus;
+use App\Enums\SubscriptionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\HostingAccount;
@@ -24,7 +27,7 @@ class BillingController extends Controller
 
         return view('customer.billing.index', [
             'invoices' => $user->invoices()->latest()->paginate(10),
-            'subscriptions' => $user->subscriptions()->with('product')->latest()->get(),
+            'subscriptions' => $user->subscriptions()->where('status', SubscriptionStatus::Active->value)->with('product')->latest()->get(),
             'payments' => $user->payments()->latest()->take(10)->get(),
             'paymentMethod' => $this->stripe->getDefaultPaymentMethod($user),
             'renewables' => $this->renewables($user),
@@ -104,7 +107,9 @@ class BillingController extends Controller
 
         $rows = collect();
 
-        foreach ($user->domains()->get() as $domain) {
+        // Only active/registered domains are renewable — failed or manual-review
+        // domains stay in the Domains tab with their status, never in Billing.
+        foreach ($user->domains()->where('status', DomainStatus::Active->value)->get() as $domain) {
             $tld = TldPricing::forDomain($domain->domain_name);
             $amount = $domainSubs->get($domain->id)?->amount
                 ?? $tld?->renew_price ?? $tld?->register_price ?? 12.99;
@@ -121,7 +126,8 @@ class BillingController extends Controller
             ]);
         }
 
-        foreach ($user->hostingAccounts()->with('hostingPackage.product.prices')->get() as $account) {
+        // Only active hosting accounts are renewable.
+        foreach ($user->hostingAccounts()->where('status', HostingStatus::Active->value)->with('hostingPackage.product.prices')->get() as $account) {
             $sub = $hostingSubs->get($account->id);
             $cycle = $sub?->billing_cycle ?? 'monthly';
             $amount = $sub?->amount

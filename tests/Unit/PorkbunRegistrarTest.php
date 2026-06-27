@@ -120,6 +120,77 @@ class PorkbunRegistrarTest extends TestCase
         $this->registrar()->registerDomain(['domain' => 'taken.com']);
     }
 
+    public function test_registration_http_400_surfaces_the_real_porkbun_reason_and_hint(): void
+    {
+        Http::fake([
+            'api.porkbun.com/api/json/v3/domain/checkDomain/*' => Http::response([
+                'status' => 'SUCCESS',
+                'response' => ['avail' => 'yes', 'price' => '8.99', 'premium' => 'no'],
+            ]),
+            'api.porkbun.com/api/json/v3/domain/create/*' => Http::response([
+                'status' => 'ERROR',
+                'message' => 'Registrant contact phone number is invalid',
+            ], 400),
+        ]);
+
+        try {
+            $this->registrar()->registerDomain(['domain' => 'goods-group.co.uk', 'whois_privacy' => true]);
+            $this->fail('Expected a RegistrarException for the HTTP 400.');
+        } catch (RegistrarException $e) {
+            // The exact Porkbun reason is surfaced (not just "HTTP 400")...
+            $this->assertStringContainsString('Registrant contact phone number is invalid', $e->getMessage());
+            // ...along with an admin hint about the registrant/contact data.
+            $this->assertStringContainsString('registrant/contact', $e->getMessage());
+        }
+    }
+
+    public function test_registration_400_with_empty_body_is_never_a_bare_http_400(): void
+    {
+        Http::fake([
+            'api.porkbun.com/api/json/v3/domain/checkDomain/*' => Http::response([
+                'status' => 'SUCCESS',
+                'response' => ['avail' => 'yes', 'price' => '8.99', 'premium' => 'no'],
+            ]),
+            'api.porkbun.com/api/json/v3/domain/create/*' => Http::response('', 400),
+        ]);
+
+        try {
+            $this->registrar()->registerDomain(['domain' => 'goods-group.co.uk', 'whois_privacy' => true]);
+            $this->fail('Expected a RegistrarException.');
+        } catch (RegistrarException $e) {
+            $this->assertStringContainsString('HTTP 400', $e->getMessage());
+            $this->assertStringContainsString('no response body', $e->getMessage());
+            // The exception carries structured context for the provisioning monitor.
+            $this->assertIsArray($e->context);
+        }
+    }
+
+    public function test_debug_register_captures_the_real_reason_without_charging(): void
+    {
+        Http::fake([
+            'api.porkbun.com/api/json/v3/domain/checkDomain/*' => Http::response([
+                'status' => 'SUCCESS',
+                'response' => ['avail' => 'yes', 'price' => '8.99', 'premium' => 'no'],
+            ]),
+            'api.porkbun.com/api/json/v3/domain/create/*' => Http::response([
+                'status' => 'SUCCESS',
+                'wouldSucceed' => 'no',
+                'message' => 'Registrant address is required for this TLD',
+            ]),
+            'api.porkbun.com/api/json/v3/domain/getRegistrationRequirements/*' => Http::response([
+                'status' => 'SUCCESS',
+                'requirements' => ['registrantName', 'registrantAddress'],
+            ]),
+        ]);
+
+        $report = $this->registrar()->debugRegister('goods-group.co.uk');
+
+        $this->assertSame('co.uk', $report['tld']);
+        $this->assertSame(899, $report['cost_pennies_sent']);
+        $this->assertStringContainsString('Registrant address is required', $report['reason']);
+        $this->assertArrayHasKey('registration_requirements', $report);
+    }
+
     public function test_update_nameservers_posts_the_ns_array(): void
     {
         Http::fake(['api.porkbun.com/*' => Http::response(['status' => 'SUCCESS'])]);

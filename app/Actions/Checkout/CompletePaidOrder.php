@@ -3,10 +3,8 @@
 namespace App\Actions\Checkout;
 
 use App\Actions\Provisioning\EnsureServiceRecords;
-use App\Enums\ItemType;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
-use App\Enums\SubscriptionStatus;
 use App\Jobs\Provisioning\ProvisionOrderJob;
 use App\Mail\OrderConfirmationMail;
 use App\Models\Order;
@@ -71,7 +69,10 @@ class CompletePaidOrder
                 $this->invoices->recordSuccessfulPayment($order, $context['payment_intent'], $context['customer'] ?? null);
             }
 
-            $this->createSubscriptions($order->fresh('items'));
+            // Renewal subscriptions are created only after provisioning succeeds
+            // (ProvisioningOrchestrator → ActivateOrderSubscriptions), never here
+            // at payment time — so a failed registration leaves no phantom
+            // renewal/auto-renew record in Billing.
 
             return true;
         });
@@ -150,26 +151,4 @@ class CompletePaidOrder
         ProvisionOrderJob::dispatch($order->id);
     }
 
-    private function createSubscriptions(Order $order): void
-    {
-        foreach ($order->items as $item) {
-            if ($item->item_type !== ItemType::Hosting) {
-                continue;
-            }
-
-            $cycle = $item->metadata['billing_cycle'] ?? 'monthly';
-            $nextRenewal = $cycle === 'yearly' ? now()->addYear() : now()->addMonth();
-
-            $order->user->subscriptions()->create([
-                'product_id' => $item->product_id,
-                'status' => SubscriptionStatus::Active->value,
-                'billing_cycle' => $cycle,
-                'currency' => $order->currency,
-                'amount' => $item->unit_price,
-                'current_period_start' => now()->toDateString(),
-                'current_period_end' => $nextRenewal->toDateString(),
-                'next_renewal_date' => $nextRenewal->toDateString(),
-            ]);
-        }
-    }
 }

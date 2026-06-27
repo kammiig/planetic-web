@@ -90,6 +90,11 @@ class ProvisioningOrchestrator
                 'order' => $order->order_number,
             ]);
         }
+
+        // Create renewal/auto-renew subscriptions now that services are live —
+        // never at payment time, so a failed registration leaves no phantom
+        // renewal record. Idempotent.
+        app(\App\Actions\Provisioning\ActivateOrderSubscriptions::class)->handle($order);
     }
 
     public function jobClassFor(ProvisioningJobType $type): string

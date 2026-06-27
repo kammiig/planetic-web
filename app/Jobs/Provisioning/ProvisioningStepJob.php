@@ -80,7 +80,8 @@ abstract class ProvisioningStepJob implements ShouldQueue
         } catch (WhmException $e) {
             $logger->failed($step, $e->getMessage(), (array) $e->context, $e->manualReview);
         } catch (ProvisioningException $e) {
-            $logger->failed($step, $e->getMessage(), [], $e->manualReview);
+            $context = is_array($e->context) ? $e->context : (filled($e->context) ? ['detail' => $e->context] : []);
+            $logger->failed($step, $e->getMessage(), $context, $e->manualReview);
         } catch (CloudflareException|RegistrarException $e) {
             $logger->failed($step, $e->getMessage());
         } catch (Throwable $e) {

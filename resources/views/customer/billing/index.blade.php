@@ -9,10 +9,15 @@
         <div class="card">
             <h2 class="text-lg font-bold">Payment method</h2>
             @if ($paymentMethod)
-                <div class="mt-3 flex items-center gap-3">
-                    <span class="grid h-10 w-14 place-items-center rounded-md border border-slate-200 bg-slate-50 text-[10px] font-bold uppercase text-slate-600">{{ $paymentMethod['brand'] }}</span>
-                    <div>
-                        <p class="font-semibold text-slate-900">{{ $paymentMethod['brand'] }} •••• {{ $paymentMethod['last4'] }}</p>
+                <div class="mt-3 flex flex-wrap items-center gap-4">
+                    <span class="flex h-11 w-16 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-slate-800 to-slate-600 text-white shadow-sm" aria-hidden="true">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+                    </span>
+                    <div class="min-w-0">
+                        <p class="font-semibold text-slate-900">
+                            <span class="capitalize">{{ $paymentMethod['brand'] }}</span>
+                            <span class="text-slate-400">•••• {{ $paymentMethod['last4'] }}</span>
+                        </p>
                         <p class="text-sm text-slate-500">Expires {{ str_pad((string) $paymentMethod['exp_month'], 2, '0', STR_PAD_LEFT) }}/{{ $paymentMethod['exp_year'] }}</p>
                     </div>
                 </div>

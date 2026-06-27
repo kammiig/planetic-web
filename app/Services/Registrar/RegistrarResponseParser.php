@@ -162,9 +162,14 @@ class RegistrarResponseParser
      * Plain-English admin guidance for the Porkbun failures we expect to see.
      * Shown in the provisioning monitor and admin alerts — never to customers.
      */
-    private function porkbunHint(string $message): ?string
+    public function porkbunHint(string $message): ?string
     {
         $message = strtolower($message);
+
+        $mentionsContact = str_contains($message, 'contact') || str_contains($message, 'registrant')
+            || str_contains($message, 'phone') || str_contains($message, 'address')
+            || str_contains($message, 'postal') || str_contains($message, 'postcode')
+            || str_contains($message, 'state') || str_contains($message, 'country');
 
         return match (true) {
             str_contains($message, 'api key') || str_contains($message, 'credential') || str_contains($message, 'invalid key')
@@ -175,6 +180,12 @@ class RegistrarResponseParser
                 => 'Enable "API Access" for this domain in the Porkbun control panel before nameserver/DNS calls will work.',
             str_contains($message, 'not available') || str_contains($message, 'unavailable') || str_contains($message, 'taken')
                 => 'The domain is no longer available to register — agree a different domain with the customer, update the order, and retry.',
+            $mentionsContact
+                => 'Porkbun rejected the registrant/contact details. Fix the default WHOIS contact on your Porkbun account: full name, a valid international phone (e.g. +44…), street address, city, postcode and a 2-letter country code. Some TLDs (e.g. .co.uk) require a complete, valid UK registrant. Correct the contact, then retry the step.',
+            str_contains($message, 'requirement') || str_contains($message, 'eligibility') || str_contains($message, 'not allowed') || str_contains($message, 'cannot be registered')
+                => 'This TLD has extra registration requirements. Review Porkbun\'s requirements for the TLD and make sure the account\'s default registrant contact satisfies them, then retry.',
+            str_contains($message, 'cost') || str_contains($message, 'price') || str_contains($message, 'amount')
+                => 'The price sent did not match Porkbun\'s current price. Run "cloudflare/tld" price sync or check the TLD price, then retry.',
             default => null,
         };
     }

@@ -14,6 +14,7 @@ class ProvisioningException extends RuntimeException
     public function __construct(
         string $message,
         public readonly bool $manualReview = false,
+        public readonly mixed $context = null,
         ?Throwable $previous = null,
     ) {
         parent::__construct($message, 0, $previous);

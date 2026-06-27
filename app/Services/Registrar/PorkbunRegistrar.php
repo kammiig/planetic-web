@@ -204,6 +204,88 @@ class PorkbunRegistrar implements RegistrarInterface
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
+    /**
+     * Diagnose a registration without charging: runs availability + a dry-run
+     * create and captures the endpoint, the exact (credential-free) payload, the
+     * HTTP status, the raw response body and the parsed reason. Never throws.
+     *
+     * @return array<string, mixed>
+     */
+    public function debugRegister(string $domain, bool $whoisPrivacy = true): array
+    {
+        $domain = strtolower(trim($domain));
+        $tld = $this->tldOf($domain);
+        $endpoint = rtrim((string) config('domain.porkbun.endpoint', 'https://api.porkbun.com/api/json/v3'), '/');
+
+        $report = [
+            'registrar' => $this->name(),
+            'domain' => $domain,
+            'tld' => $tld,
+            'endpoint' => $endpoint.'/domain/create/'.$domain,
+        ];
+
+        // Availability + price → this price (in pennies) is the `cost` we send.
+        try {
+            $check = $this->checkAvailability($domain);
+            $report['availability'] = ['available' => $check['available'], 'price' => $check['price'], 'premium' => $check['premium']];
+            $report['cost_pennies_sent'] = (int) round(((float) ($check['price'] ?? 0)) * 100);
+        } catch (Throwable $e) {
+            $report['availability'] = ['error' => Secrets::redact($e->getMessage())];
+        }
+
+        $report['request_payload'] = [
+            'cost' => $report['cost_pennies_sent'] ?? 0,
+            'agreeToTerms' => 'yes',
+            'whoisPrivacy' => $whoisPrivacy ? 'yes' : 'no',
+            'dryRun' => true,
+            // apikey / secretapikey are added internally and never shown.
+        ];
+
+        // No-charge dry-run create — capture the exact reason and response body.
+        try {
+            $result = $this->registerDomain(['domain' => $domain, 'whois_privacy' => $whoisPrivacy, 'dry_run' => true]);
+            $report['http_status'] = 200;
+            $report['reason'] = 'Dry-run reports the registration WOULD succeed.';
+            $report['response_body'] = Secrets::redactArray($result);
+        } catch (RegistrarException $e) {
+            $report['reason'] = Secrets::redact($e->getMessage());
+            $report['response_body'] = is_array($e->context) ? $e->context : ['detail' => Secrets::redact((string) $e->context)];
+        }
+
+        $report['registration_requirements'] = $this->getRegistrationRequirements($tld);
+
+        return $report;
+    }
+
+    /**
+     * Fetch Porkbun's registration requirements for a TLD (eligibility TLDs such
+     * as .co.uk may need extra registrant fields). Returns the raw (redacted)
+     * response or an error note — never throws.
+     *
+     * @return array<string, mixed>
+     */
+    public function getRegistrationRequirements(string $tldOrDomain): array
+    {
+        $tld = $this->tldOf($tldOrDomain);
+        $config = config('domain.porkbun');
+        $endpoint = rtrim((string) ($config['endpoint'] ?? 'https://api.porkbun.com/api/json/v3'), '/');
+
+        try {
+            $response = Http::timeout((int) config('domain.request_timeout', 30))
+                ->acceptJson()
+                ->post($endpoint.'/domain/getRegistrationRequirements/'.$tld, [
+                    'apikey' => $config['api_key'] ?? null,
+                    'secretapikey' => $config['secret_key'] ?? null,
+                ]);
+
+            return Secrets::redactArray(
+                is_array($response->json()) ? $response->json() : ['status' => $response->status(), 'raw' => Secrets::redact($response->body())]
+            );
+        } catch (Throwable $e) {
+            return ['error' => Secrets::redact($e->getMessage())];
+        }
+    }
+
     private function command(string $path, array $payload, string $label, bool $auth = true, string $method = 'POST'): array
     {
         $config = config('domain.porkbun');
@@ -236,7 +318,33 @@ class PorkbunRegistrar implements RegistrarInterface
         }
 
         if ($response->failed()) {
-            throw new RegistrarException("Porkbun {$label} HTTP {$response->status()}.", registrar: 'porkbun', context: Secrets::redact($response->body()));
+            // Surface Porkbun's actual error reason — never a bare "HTTP 400".
+            // Porkbun returns {status:"ERROR", message:"…"} even on 4xx, but if
+            // the body is empty/non-JSON we still attach the raw (redacted) body
+            // so the admin always sees something concrete. The full body is also
+            // stored on the exception context for the provisioning monitor.
+            $body = is_array($response->json()) ? $response->json() : [];
+            $reason = trim((string) ($body['message'] ?? ''));
+            $rawBody = trim(Secrets::redact($response->body()));
+            $rawBody = mb_strlen($rawBody) > 500 ? mb_substr($rawBody, 0, 500).'…' : $rawBody;
+
+            $detail = $reason !== ''
+                ? Secrets::redact($reason)
+                : ($rawBody !== '' ? $rawBody : '<no response body>');
+            $hint = $this->parser->porkbunHint($detail);
+
+            Log::channel('stack')->warning('Porkbun '.$label.' rejected', [
+                'path' => $path,
+                'status' => $response->status(),
+                'reason' => $detail,
+                'body' => $rawBody,
+            ]);
+
+            throw new RegistrarException(
+                "Porkbun {$label} HTTP {$response->status()}: {$detail}".($hint ? " — {$hint}" : ''),
+                registrar: 'porkbun',
+                context: ! empty($body) ? Secrets::redactArray($body) : ['status' => $response->status(), 'body' => $rawBody],
+            );
         }
 
         return $this->parser->porkbunReply($response->json() ?? [], $label);

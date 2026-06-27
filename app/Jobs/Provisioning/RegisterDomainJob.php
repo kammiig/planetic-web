@@ -11,6 +11,8 @@ use App\Models\Order;
 use App\Models\ProvisioningJob;
 use App\Services\Registrar\RegistrarInterface;
 use App\Support\DomainName;
+use App\Support\RegistrantValidator;
+use App\Support\Secrets;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -72,6 +74,22 @@ class RegisterDomainJob extends ProvisioningStepJob
             return ['simulated' => true, 'domain' => $domainName];
         }
 
+        $contact = $this->contactData($order);
+
+        // Validate the registrant contact BEFORE any registrar call, so missing
+        // or placeholder data fails fast with a clear, actionable reason rather
+        // than a cryptic registrar HTTP 400.
+        $missing = RegistrantValidator::missing($contact);
+        if ($missing !== []) {
+            $domain->update(['status' => DomainStatus::Failed->value]);
+            throw new ProvisioningException(
+                'Action required: the customer registrant contact is incomplete — '.implode('; ', $missing)
+                .'. Ask the customer to complete their billing details (or set them in admin), then retry this step.',
+                manualReview: true,
+                context: ['missing_contact_fields' => $missing, 'tld' => $parsed->tld],
+            );
+        }
+
         $registrar = app(RegistrarInterface::class);
 
         try {
@@ -80,12 +98,26 @@ class RegisterDomainJob extends ProvisioningStepJob
                 'years' => config('domain.defaults.years', 1),
                 'whois_privacy' => $domain->whois_privacy,
                 'auto_renew' => $domain->auto_renew,
-                'contact' => $this->contactData($order),
+                'contact' => $contact,
             ]);
         } catch (RegistrarException $e) {
-            // Payment succeeded but registration failed → manual review.
+            // Payment succeeded but registration failed → manual review. Carry
+            // the registrar's raw (redacted) response into the provisioning job
+            // so the admin sees the real reason, not just "HTTP 400".
             $domain->update(['status' => DomainStatus::Failed->value]);
-            throw new ProvisioningException($e->getMessage(), manualReview: true, previous: $e);
+            throw new ProvisioningException(
+                $e->getMessage(),
+                manualReview: true,
+                context: array_filter([
+                    'registrar' => $e->registrar,
+                    'domain' => $domainName,
+                    'tld' => $parsed->tld,
+                    'registrar_response' => is_array($e->context)
+                        ? Secrets::redactArray($e->context)
+                        : (filled($e->context) ? Secrets::redact((string) $e->context) : null),
+                ], fn ($v) => $v !== null),
+                previous: $e,
+            );
         }
 
         $expiry = $result['expiry_date'] ? Carbon::parse($result['expiry_date']) : now()->addYear();
