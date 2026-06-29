@@ -115,4 +115,18 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Trustpilot AFS (Automatic Feedback Service) BCC
+    |--------------------------------------------------------------------------
+    |
+    | When set, this address is added as a BCC on successful paid order
+    | confirmation emails only, so Trustpilot can invite the customer to leave
+    | a review. Leave empty to disable. It must never be added to any other
+    | email (password resets, login, support, failed payments, admin, tests).
+    |
+    */
+
+    'trustpilot_afs_bcc' => env('TRUSTPILOT_AFS_BCC'),
+
 ];

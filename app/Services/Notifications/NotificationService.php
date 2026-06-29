@@ -17,7 +17,15 @@ use Throwable;
  */
 class NotificationService
 {
-    public function send(User $user, Mailable $mailable, string $type): NotificationLog
+    /**
+     * @param  bool  $trustpilotBcc  Opt-in. Only pass true for successful paid
+     *                               order confirmations — it BCCs the Trustpilot
+     *                               AFS address so the customer is invited to
+     *                               leave a review. Never pass true for any other
+     *                               email type (resets, login, support, failed
+     *                               payments, admin alerts, tests).
+     */
+    public function send(User $user, Mailable $mailable, string $type, bool $trustpilotBcc = false): NotificationLog
     {
         $log = NotificationLog::create([
             'user_id' => $user->id,
@@ -29,7 +37,19 @@ class NotificationService
         ]);
 
         try {
-            Mail::to($user->email)->send($mailable);
+            // Customer always stays in TO.
+            $pending = Mail::to($user->email);
+
+            // Trustpilot goes into BCC only — never CC/TO — and only when this
+            // caller opted in and an address is actually configured in .env.
+            $trustpilotAddress = $trustpilotBcc ? trim((string) config('mail.trustpilot_afs_bcc')) : '';
+            if ($trustpilotAddress !== '') {
+                $pending->bcc($trustpilotAddress);
+                // Safe log: records the fact only, no customer email/name/order.
+                Log::channel('stack')->info('Trustpilot AFS BCC added', ['type' => $type]);
+            }
+
+            $pending->send($mailable);
             $log->update(['status' => 'sent', 'sent_at' => now()]);
         } catch (Throwable $e) {
             $log->update(['status' => 'failed', 'failed_at' => now(), 'error_message' => $e->getMessage()]);

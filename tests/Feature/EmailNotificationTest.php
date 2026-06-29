@@ -70,6 +70,49 @@ class EmailNotificationTest extends TestCase
         Mail::assertSent(OrderConfirmationMail::class);
     }
 
+    public function test_paid_order_confirmation_bccs_trustpilot_with_customer_in_to(): void
+    {
+        config(['mail.trustpilot_afs_bcc' => 'planeticweb.com+bacf333d3f@invite.trustpilot.com']);
+        Mail::fake();
+        $order = $this->order();
+
+        app(NotificationService::class)->send($order->user, new OrderConfirmationMail($order), 'order_confirmation', trustpilotBcc: true);
+
+        Mail::assertSent(OrderConfirmationMail::class, function (OrderConfirmationMail $mail) use ($order) {
+            return $mail->hasTo($order->user->email)
+                && $mail->hasBcc('planeticweb.com+bacf333d3f@invite.trustpilot.com')
+                && ! $mail->hasCc('planeticweb.com+bacf333d3f@invite.trustpilot.com')
+                && ! $mail->hasTo('planeticweb.com+bacf333d3f@invite.trustpilot.com');
+        });
+    }
+
+    public function test_non_order_emails_never_get_trustpilot_bcc(): void
+    {
+        config(['mail.trustpilot_afs_bcc' => 'planeticweb.com+bacf333d3f@invite.trustpilot.com']);
+        Mail::fake();
+        $order = $this->order();
+
+        // Default call (trustpilotBcc omitted) — e.g. failed payment, support, admin.
+        app(NotificationService::class)->send($order->user, new PaymentFailedMail($order), 'payment_failed');
+
+        Mail::assertSent(PaymentFailedMail::class, function (PaymentFailedMail $mail) {
+            return ! $mail->hasBcc('planeticweb.com+bacf333d3f@invite.trustpilot.com');
+        });
+    }
+
+    public function test_no_bcc_added_when_trustpilot_env_is_empty(): void
+    {
+        config(['mail.trustpilot_afs_bcc' => '']);
+        Mail::fake();
+        $order = $this->order();
+
+        app(NotificationService::class)->send($order->user, new OrderConfirmationMail($order), 'order_confirmation', trustpilotBcc: true);
+
+        Mail::assertSent(OrderConfirmationMail::class, function (OrderConfirmationMail $mail) use ($order) {
+            return $mail->hasTo($order->user->email) && empty($mail->bcc);
+        });
+    }
+
     public function test_order_confirmation_logs_failure_when_mail_throws(): void
     {
         // Force the transport to fail.

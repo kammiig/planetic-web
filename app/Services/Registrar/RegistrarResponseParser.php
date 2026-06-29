@@ -173,7 +173,9 @@ class RegistrarResponseParser
 
         return match (true) {
             str_contains($message, 'rate limit') || str_contains($message, 'rate_limit') || str_contains($message, 'checks within') || str_contains($message, 'too many')
-                => 'Porkbun rate-limited the request (its domain availability checks allow roughly one every 10 seconds). This is transient — registration now prices via the non-rate-limited pricing endpoint, so just retry the step in a few seconds.',
+                => 'Porkbun rate-limited the request (its domain availability checks allow roughly one every 10 seconds). This is transient — registration reuses the checkout search result and waits out the window, so just retry the step in a few seconds.',
+            str_contains($message, 'unable to register') || str_contains($message, 'cannot register') || str_contains($message, 'registration failed')
+                => 'Porkbun accepted the request but the REGISTRY could not complete it (it returns a Porkbun orderId — look it up in your Porkbun dashboard for the exact reason). Most often the Porkbun account BALANCE is too low to pay for the domain, or — for .uk/.co.uk — the account\'s default registrant ADDRESS has not been validated by Nominet. Fund the account / validate the registrant contact in the Porkbun panel, then retry. (Porkbun\'s .uk create accepts no contact fields, so the registrant is always the account default.)',
             str_contains($message, 'api key') || str_contains($message, 'credential') || str_contains($message, 'invalid key')
                 => 'Check PORKBUN_API_KEY / PORKBUN_SECRET_KEY in the server .env — Porkbun rejected the credentials.',
             str_contains($message, 'balance') || str_contains($message, 'fund') || str_contains($message, 'insufficient')

@@ -104,6 +104,7 @@ class CompletePaidOrder
             $order->user,
             new OrderConfirmationMail($order->fresh('items')),
             'order_confirmation',
+            trustpilotBcc: true, // Successful paid order → invite the customer to review.
         );
 
         // A bespoke website sale needs a human kick-off — tell the admin team.
