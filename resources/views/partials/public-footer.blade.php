@@ -12,7 +12,7 @@
         'linkedin' => 'M4.98 3.5A2.5 2.5 0 1 1 0 3.5a2.5 2.5 0 0 1 4.98 0zM0 8h5v16H0zM7.5 8h4.8v2.2h.07c.67-1.2 2.3-2.5 4.7-2.5 5 0 5.9 3.3 5.9 7.6V24h-5v-7.1c0-1.7 0-3.9-2.4-3.9s-2.7 1.8-2.7 3.8V24h-5z',
     ];
 @endphp
-<footer class="mt-20 bg-primary-950 text-slate-300">
+<footer class="bg-primary-950 text-slate-300">
     <div class="container-px grid grid-cols-2 gap-8 py-14 md:grid-cols-5">
         <div class="col-span-2">
             <div class="flex items-center gap-2 text-white">

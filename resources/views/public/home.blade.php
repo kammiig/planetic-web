@@ -7,85 +7,99 @@
     {{-- ============================ Hero ============================ --}}
     <section class="relative overflow-hidden hero-aurora text-white">
         <div class="absolute inset-0 hero-grid opacity-60" aria-hidden="true"></div>
-        <div class="hero-orb -right-24 -top-24 h-72 w-72 bg-accent-cyan/20" aria-hidden="true"></div>
-        <div class="hero-orb -left-32 top-1/3 h-80 w-80 bg-accent-indigo/15" aria-hidden="true"></div>
+        <div class="hero-orb -right-28 -top-28 h-80 w-80 bg-accent-cyan/20" aria-hidden="true"></div>
+        <div class="hero-orb -left-32 top-24 h-80 w-80 bg-accent-indigo/15" aria-hidden="true"></div>
+        {{-- Bottom-centre aurora glow, echoing the reference's light beam --}}
+        <div class="hero-orb bottom-[-6rem] left-1/2 h-72 w-[42rem] max-w-[90%] -translate-x-1/2 bg-accent-sky/25" aria-hidden="true"></div>
 
-        <div class="container-px relative grid items-center gap-12 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:py-24">
-            {{-- Left: headline + domain search --}}
-            <div class="flex flex-col justify-center">
-                <p class="inline-flex items-center gap-2 self-start rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-accent-cyan backdrop-blur">
-                    <span class="badge-dot bg-accent-cyan"></span>
-                    {{ setting('hero.eyebrow', 'Domains · Hosting · Bespoke Websites') }}
-                </p>
+        <div class="container-px relative py-16 lg:py-20">
+            {{-- Row 1: headline (left) + cloud console visual (right), vertically balanced --}}
+            <div class="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+                <div class="flex flex-col">
+                    <p class="inline-flex items-center gap-2 self-start rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-accent-cyan backdrop-blur">
+                        <span class="badge-dot bg-accent-cyan"></span>
+                        {{ setting('hero.eyebrow', 'Domains · Hosting · Bespoke Websites') }}
+                    </p>
 
-                <h1 class="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-                    {{ setting('hero.title', 'Super fast & secure web hosting') }}
-                    <span class="gradient-text block">{{ setting('hero.title_accent', 'built for your business.') }}</span>
-                </h1>
+                    <h1 class="mt-6 text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+                        {{ setting('hero.title', 'Super fast & secure web hosting') }}
+                        <span class="gradient-text block">{{ setting('hero.title_accent', 'built for your business.') }}</span>
+                    </h1>
 
-                <p class="mt-5 max-w-xl text-lg text-slate-300">
-                    {{ setting('hero.subtitle', 'Search a domain, choose a plan, and let Planetic Web register, host and configure everything automatically. Uptime you can trust, support you can reach.') }}
-                </p>
+                    <p class="mt-6 max-w-xl text-lg leading-relaxed text-slate-300">
+                        {{ setting('hero.subtitle', 'Search a domain, choose a plan, and let Planetic Web register, host and configure everything automatically. Uptime you can trust, support you can reach.') }}
+                    </p>
 
-                {{-- Domain search panel (reference: dark rounded "Register a Domain Name") --}}
-                <div class="mt-8 rounded-[20px] border border-white/10 bg-white/[0.04] p-4 ring-1 ring-white/5 backdrop-blur sm:p-5">
-                    <p class="mb-3 text-sm font-semibold text-white">Register a domain name</p>
-                    <x-domain-search variant="hero" :autofocus="false" />
+                    <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                        <a href="{{ route('website-package') }}" class="btn-primary w-full sm:w-auto">Get a complete website</a>
+                        <a href="{{ route('hosting.index') }}" class="btn-ghost-dark w-full sm:w-auto">View hosting plans</a>
+                    </div>
+                </div>
 
-                    @if ($featuredTlds->isNotEmpty())
-                        <div class="mt-4 flex flex-wrap gap-2">
-                            @foreach ($featuredTlds as $tld)
-                                <a href="{{ route('domains.index') }}" class="tld-chip">
-                                    .{{ ltrim($tld->tld, '.') }}
-                                    <span class="tld-chip-price">£{{ number_format($tld->register_price, 2) }}/yr</span>
-                                </a>
-                            @endforeach
+                {{-- Cloud console visual --}}
+                <div class="relative flex justify-center lg:justify-end">
+                    <div class="absolute -right-4 top-6 hidden h-32 w-32 rotate-12 rounded-[20px] bg-gradient-to-br from-accent-sky/30 to-accent-indigo/10 blur-[2px] lg:block" aria-hidden="true"></div>
+
+                    <div class="card-console relative w-full max-w-md">
+                        <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                            <span class="text-sm font-semibold">Planetic Cloud Console</span>
+                            <span class="badge badge-success"><span class="badge-dot"></span> All systems operational</span>
                         </div>
-                    @endif
-                </div>
-
-                <dl class="mt-10 flex flex-wrap gap-x-10 gap-y-4">
-                    <div>
-                        <dt class="stat-value">{{ setting('stats.uptime', '99.9%') }}</dt>
-                        <dd class="stat-label">Uptime SLA</dd>
-                    </div>
-                    <div>
-                        <dt class="stat-value">{{ setting('stats.support', '24/7') }}</dt>
-                        <dd class="stat-label">Expert support</dd>
-                    </div>
-                    <div>
-                        <dt class="stat-value">{{ setting('stats.sites', '500+') }}</dt>
-                        <dd class="stat-label">Sites launched</dd>
-                    </div>
-                </dl>
-            </div>
-
-            {{-- Right: isometric server / cloud console visual --}}
-            <div class="relative flex items-center justify-center">
-                <div class="hero-orb bottom-0 left-1/2 h-40 w-64 -translate-x-1/2 bg-accent-sky/30" aria-hidden="true"></div>
-
-                {{-- Stacked "server" plates behind the console for depth --}}
-                <div class="absolute right-6 top-2 hidden h-32 w-32 rotate-12 rounded-[20px] bg-gradient-to-br from-accent-sky/30 to-accent-indigo/10 blur-[2px] lg:block" aria-hidden="true"></div>
-
-                <div class="card-console relative w-full max-w-md">
-                    <div class="flex items-center justify-between border-b border-white/10 pb-3">
-                        <span class="text-sm font-semibold">Planetic Cloud Console</span>
-                        <span class="badge badge-success"><span class="badge-dot"></span> All systems operational</span>
-                    </div>
-                    <dl class="mt-4 space-y-3 text-sm">
-                        <div class="flex items-center justify-between"><dt class="text-slate-400">Domain</dt><dd class="font-medium">yourbusiness.co.uk</dd></div>
-                        <div class="flex items-center justify-between"><dt class="text-slate-400">Hosting</dt><dd><span class="badge badge-success"><span class="badge-dot"></span> Active</span></dd></div>
-                        <div class="flex items-center justify-between"><dt class="text-slate-400">DNS (Cloudflare)</dt><dd><span class="badge badge-success"><span class="badge-dot"></span> Proxied</span></dd></div>
-                        <div class="flex items-center justify-between"><dt class="text-slate-400">SSL</dt><dd><span class="badge badge-success"><span class="badge-dot"></span> Secured</span></dd></div>
-                        <div class="flex items-center justify-between"><dt class="text-slate-400">Business email</dt><dd><span class="badge badge-success"><span class="badge-dot"></span> Ready</span></dd></div>
-                        <div class="flex items-center justify-between"><dt class="text-slate-400">Next renewal</dt><dd class="font-medium">{{ now()->addYear()->format('j M Y') }}</dd></div>
-                    </dl>
-                    <div class="mt-5 flex items-center gap-3 border-t border-white/10 pt-4 text-xs text-slate-300">
-                        <svg class="h-4 w-4 text-accent-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M9 11l3 3L22 4"/></svg>
-                        Provisioned automatically after checkout — nothing to configure.
+                        <dl class="mt-4 space-y-3 text-sm">
+                            <div class="flex items-center justify-between"><dt class="text-slate-400">Domain</dt><dd class="font-medium">yourbusiness.co.uk</dd></div>
+                            <div class="flex items-center justify-between"><dt class="text-slate-400">Hosting</dt><dd><span class="badge badge-success"><span class="badge-dot"></span> Active</span></dd></div>
+                            <div class="flex items-center justify-between"><dt class="text-slate-400">DNS (Cloudflare)</dt><dd><span class="badge badge-success"><span class="badge-dot"></span> Proxied</span></dd></div>
+                            <div class="flex items-center justify-between"><dt class="text-slate-400">SSL</dt><dd><span class="badge badge-success"><span class="badge-dot"></span> Secured</span></dd></div>
+                            <div class="flex items-center justify-between"><dt class="text-slate-400">Business email</dt><dd><span class="badge badge-success"><span class="badge-dot"></span> Ready</span></dd></div>
+                            <div class="flex items-center justify-between"><dt class="text-slate-400">Next renewal</dt><dd class="font-medium">{{ now()->addYear()->format('j M Y') }}</dd></div>
+                        </dl>
+                        <div class="mt-5 flex items-center gap-3 border-t border-white/10 pt-4 text-xs text-slate-300">
+                            <svg class="h-4 w-4 flex-shrink-0 text-accent-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M9 11l3 3L22 4"/></svg>
+                            Provisioned automatically after checkout — nothing to configure.
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {{-- Row 2: full-width domain search band (reference: "Register a Domain Name") --}}
+            <div class="relative mt-12 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.05] p-5 shadow-dark ring-1 ring-white/5 backdrop-blur sm:p-7 lg:mt-14">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <p class="flex items-center gap-2 text-base font-semibold text-white">
+                        <svg class="h-5 w-5 text-accent-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"/></svg>
+                        Register a domain name
+                    </p>
+                    <span class="hidden text-xs text-slate-400 sm:inline">Free WHOIS privacy · transfers &amp; renewals supported</span>
+                </div>
+
+                <x-domain-search variant="hero" :autofocus="false" />
+
+                @if ($featuredTlds->isNotEmpty())
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        @foreach ($featuredTlds as $tld)
+                            <a href="{{ route('domains.index') }}" class="tld-chip">
+                                .{{ ltrim($tld->tld, '.') }}
+                                <span class="tld-chip-price">£{{ number_format($tld->register_price, 2) }}/yr</span>
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+
+            {{-- Row 3: trust stats, evenly spaced --}}
+            <dl class="mt-12 grid grid-cols-3 gap-4 border-t border-white/10 pt-8 text-center sm:gap-8 sm:text-left">
+                <div>
+                    <dt class="stat-value">{{ setting('stats.uptime', '99.9%') }}</dt>
+                    <dd class="stat-label">Uptime SLA</dd>
+                </div>
+                <div class="sm:border-l sm:border-white/10 sm:pl-8">
+                    <dt class="stat-value">{{ setting('stats.support', '24/7') }}</dt>
+                    <dd class="stat-label">Expert support</dd>
+                </div>
+                <div class="sm:border-l sm:border-white/10 sm:pl-8">
+                    <dt class="stat-value">{{ setting('stats.sites', '500+') }}</dt>
+                    <dd class="stat-label">Sites launched</dd>
+                </div>
+            </dl>
         </div>
     </section>
 
@@ -323,16 +337,18 @@
         </section>
     @endif
 
-    {{-- ===================== Final CTA ===================== --}}
-    <section class="container-px section">
-        <div class="relative mx-auto max-w-4xl overflow-hidden rounded-[24px] hero-aurora p-10 text-center text-white sm:p-14">
-            <div class="absolute inset-0 hero-grid opacity-50" aria-hidden="true"></div>
-            <div class="relative">
+    {{-- ===================== Final CTA (full-width premium band) ===================== --}}
+    <section class="relative overflow-hidden hero-aurora text-white">
+        <div class="absolute inset-0 hero-grid opacity-50" aria-hidden="true"></div>
+        <div class="hero-orb bottom-[-5rem] left-1/2 h-60 w-[40rem] max-w-[90%] -translate-x-1/2 bg-accent-sky/25" aria-hidden="true"></div>
+
+        <div class="container-px relative section text-center">
+            <div class="mx-auto max-w-2xl">
                 <h2 class="text-3xl font-bold sm:text-4xl">{{ setting('cta.title', 'Ready to get online?') }}</h2>
-                <p class="mt-3 text-slate-300">{{ setting('cta.subtitle', 'Search your domain or start your £200 complete website today.') }}</p>
-                <div class="mt-7 flex flex-wrap justify-center gap-3">
-                    <a href="{{ route('domains.index') }}" class="btn-primary">Search a domain</a>
-                    <a href="{{ route('website-package') }}" class="btn-ghost-dark">Get a website</a>
+                <p class="mx-auto mt-4 max-w-xl text-lg text-slate-300">{{ setting('cta.subtitle', 'Search your domain or start your £200 complete website today.') }}</p>
+                <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                    <a href="{{ route('domains.index') }}" class="btn-primary w-full sm:w-auto">Search a domain</a>
+                    <a href="{{ route('website-package') }}" class="btn-ghost-dark w-full sm:w-auto">Get a website</a>
                 </div>
             </div>
         </div>
