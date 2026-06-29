@@ -24,6 +24,11 @@ class HomeController extends Controller
             ->sortBy(fn (Product $p) => $p->hostingPackage?->sort_order ?? $p->sort_order)
             ->values();
 
+        // The homepage shows a single, opinionated hosting offer (not the full
+        // grid): the admin-flagged popular plan, falling back to the first one.
+        $businessHosting = $hostingPlans->first(fn (Product $p) => (bool) $p->hostingPackage?->is_popular)
+            ?? $hostingPlans->first();
+
         $websitePackage = WebsitePackage::active()
             ->with('product.activePrices')
             ->orderBy('sort_order')
@@ -31,6 +36,7 @@ class HomeController extends Controller
 
         return view('public.home', [
             'hostingPlans' => $hostingPlans,
+            'businessHosting' => $businessHosting,
             'websitePackage' => $websitePackage,
             'websitePackagePrice' => $websitePackage?->price() ?? config('billing.website_package.price'),
             'freeYearNotice' => config('billing.website_package.free_year_notice'),
