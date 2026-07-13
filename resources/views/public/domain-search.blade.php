@@ -1,7 +1,7 @@
 @extends('layouts.public')
 
-@section('title', 'Search for a Domain')
-@section('meta_description', 'Search and register your domain with free WHOIS privacy and automatic Cloudflare DNS setup. Or get it free with our £200 bespoke website package.')
+@section('title', 'Domain Name Registration UK — .co.uk from £8.99/yr')
+@section('meta_description', 'Register a UK domain name with free WHOIS privacy and automatic Cloudflare DNS. .co.uk from £8.99/yr, .com from £12.99/yr — or free with our £200 website package.')
 
 @section('content')
     <div

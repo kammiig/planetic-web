@@ -1,7 +1,7 @@
 @extends('layouts.public')
 
-@section('title', 'Premium Hosting, Domains & Bespoke Websites')
-@section('meta_description', 'UK domains, fast cPanel hosting, and a complete bespoke website for £200 with a free domain and hosting for the first year — built, secured and managed for you by Planetic Web.')
+@section('title', 'Small Business Website Design, Hosting & Domains UK')
+@section('meta_description', 'Get a complete website for your small business for £200 — bespoke design, free domain and hosting for the first year, SSL and email all set up for you. UK-based support.')
 
 @section('content')
     {{-- ============================ Hero ============================ --}}
@@ -96,8 +96,8 @@
                     <dd class="stat-label">Expert support</dd>
                 </div>
                 <div class="sm:border-l sm:border-white/10 sm:pl-8">
-                    <dt class="stat-value">{{ setting('stats.sites', '500+') }}</dt>
-                    <dd class="stat-label">Sites launched</dd>
+                    <dt class="stat-value">{{ setting('stats.sites', '~2 weeks') }}</dt>
+                    <dd class="stat-label">{{ setting('stats.sites_label', 'Typical website build') }}</dd>
                 </div>
             </dl>
         </div>

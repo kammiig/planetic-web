@@ -1,7 +1,7 @@
 @extends('layouts.public')
 
-@section('title', 'Fast, Secure cPanel Web Hosting')
-@section('meta_description', 'Fast, secure cPanel hosting with free SSL and Cloudflare DNS. Starter, Business, Pro and Agency plans — monthly or yearly, upgrade any time.')
+@section('title', 'UK Web Hosting — Fast cPanel Hosting with Free SSL')
+@section('meta_description', 'Fast, secure UK web hosting with cPanel, free SSL, Cloudflare DNS and business email. Monthly or yearly plans for small businesses — upgrade any time.')
 
 @section('content')
     <section class="relative overflow-hidden hero-gradient text-white">

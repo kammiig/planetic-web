@@ -1,7 +1,7 @@
 @extends('layouts.public')
 
-@section('title', 'Complete Bespoke Website for £200')
-@section('meta_description', 'A complete bespoke website for £200, with free domain and hosting for the first year. Renewal applies after the first year.')
+@section('title', 'Small Business Website Design UK — Complete Website for £200')
+@section('meta_description', 'How much does a website cost? Ours is £200 all-in: bespoke small business website design with a free domain and hosting for the first year, SSL and email set up for you. Ready in about two weeks.')
 
 @php
     $productSchema = [
