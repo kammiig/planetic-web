@@ -23,3 +23,6 @@ deployment:
     # must be copied there on every deploy. index.php/.htaccess in public_html
     # are deliberately NOT touched (they were adjusted to bootstrap this app).
     - /bin/bash -c '[ -d "$HOME/public_html" ] && [ ! -L "$HOME/public_html/build" ] && /usr/bin/rsync -a --delete ./public/build/ "$HOME/public_html/build/" || true'
+    # Static images (e.g. the default Open Graph share image) must also reach
+    # the live document root, same reason as the build assets above.
+    - /bin/bash -c '[ -d "$HOME/public_html" ] && [ -d ./public/images ] && /usr/bin/rsync -a ./public/images/ "$HOME/public_html/images/" || true'

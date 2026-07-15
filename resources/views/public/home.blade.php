@@ -96,8 +96,8 @@
                     <dd class="stat-label">Expert support</dd>
                 </div>
                 <div class="sm:border-l sm:border-white/10 sm:pl-8">
-                    <dt class="stat-value">{{ setting('stats.sites', '~2 weeks') }}</dt>
-                    <dd class="stat-label">{{ setting('stats.sites_label', 'Typical website build') }}</dd>
+                    <dt class="stat-value">{{ setting('stats.sites', '500+') }}</dt>
+                    <dd class="stat-label">{{ setting('stats.sites_label', 'Sites launched') }}</dd>
                 </div>
             </dl>
         </div>
