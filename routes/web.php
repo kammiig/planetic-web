@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\Customer\CartController;
+use App\Http\Controllers\Public\BlogController;
 use App\Http\Controllers\Public\ContactController;
 use App\Http\Controllers\Public\DomainSearchController;
 use App\Http\Controllers\Public\HomeController;
@@ -20,6 +21,10 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/website-package', [WebsitePackageController::class, 'index'])->name('website-package');
 Route::get('/hosting', [PricingController::class, 'index'])->name('hosting.index');
 Route::get('/domains', [DomainSearchController::class, 'index'])->name('domains.index');
+
+// Blog
+Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
+Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 
 Route::get('/contact', [ContactController::class, 'index'])->name('contact');
 Route::post('/contact', [ContactController::class, 'store'])

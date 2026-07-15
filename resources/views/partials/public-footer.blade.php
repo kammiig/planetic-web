@@ -42,6 +42,7 @@
                 <li><a class="hover:text-white" href="{{ route('website-package') }}">Website Package</a></li>
                 <li><a class="hover:text-white" href="{{ route('hosting.index') }}">Hosting Plans</a></li>
                 <li><a class="hover:text-white" href="{{ route('domains.index') }}">Domain Search</a></li>
+                <li><a class="hover:text-white" href="{{ route('blog.index') }}">Blog</a></li>
             </ul>
         </div>
 

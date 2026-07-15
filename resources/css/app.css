@@ -331,4 +331,48 @@
     .rating-summary {
         @apply inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-full border border-slate-200 bg-white px-5 py-2.5 shadow-soft;
     }
+
+    /* ---- Blog article body (rendered Markdown) ---- */
+    .prose-blog {
+        @apply text-base leading-relaxed text-slate-700;
+    }
+    .prose-blog h2 {
+        @apply mt-10 text-2xl font-bold tracking-tight text-slate-900;
+    }
+    .prose-blog h3 {
+        @apply mt-8 text-xl font-bold text-slate-900;
+    }
+    .prose-blog p {
+        @apply mt-4;
+    }
+    .prose-blog a {
+        @apply font-semibold text-primary-600 underline decoration-primary-400 underline-offset-2 hover:text-primary-700;
+    }
+    .prose-blog ul {
+        @apply mt-4 list-disc space-y-2 pl-6;
+    }
+    .prose-blog ol {
+        @apply mt-4 list-decimal space-y-2 pl-6;
+    }
+    .prose-blog blockquote {
+        @apply mt-6 border-l-4 border-primary-400 bg-slate-50 px-5 py-3 italic text-slate-600;
+    }
+    .prose-blog table {
+        @apply mt-6 w-full border-collapse text-sm;
+    }
+    .prose-blog th {
+        @apply border-b-2 border-slate-200 px-3 py-2 text-left font-bold text-slate-900;
+    }
+    .prose-blog td {
+        @apply border-b border-slate-100 px-3 py-2 align-top;
+    }
+    .prose-blog code {
+        @apply rounded bg-slate-100 px-1.5 py-0.5 text-sm text-slate-800;
+    }
+    .prose-blog hr {
+        @apply my-10 border-slate-200;
+    }
+    .prose-blog strong {
+        @apply font-bold text-slate-900;
+    }
 }

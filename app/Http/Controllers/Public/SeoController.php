@@ -21,6 +21,7 @@ class SeoController extends Controller
             ['route' => 'website-package', 'priority' => '0.9', 'freq' => 'monthly'],
             ['route' => 'hosting.index', 'priority' => '0.9', 'freq' => 'weekly'],
             ['route' => 'domains.index', 'priority' => '0.9', 'freq' => 'weekly'],
+            ['route' => 'blog.index', 'priority' => '0.7', 'freq' => 'weekly'],
             ['route' => 'contact', 'priority' => '0.6', 'freq' => 'monthly'],
             ['route' => 'legal.privacy', 'priority' => '0.3', 'freq' => 'yearly'],
             ['route' => 'legal.terms', 'priority' => '0.3', 'freq' => 'yearly'],
@@ -47,6 +48,16 @@ class SeoController extends Controller
                 .'    <lastmod>'.$lastmod.'</lastmod>'."\n"
                 .'    <changefreq>'.$page['freq'].'</changefreq>'."\n"
                 .'    <priority>'.$page['priority'].'</priority>'."\n"
+                .'  </url>'."\n";
+        }
+
+        // Published blog posts.
+        foreach (\App\Models\Post::published()->get() as $post) {
+            $urls .= '  <url>'."\n"
+                .'    <loc>'.e(route('blog.show', $post->slug)).'</loc>'."\n"
+                .'    <lastmod>'.$post->updated_at->toDateString().'</lastmod>'."\n"
+                .'    <changefreq>monthly</changefreq>'."\n"
+                .'    <priority>0.7</priority>'."\n"
                 .'  </url>'."\n";
         }
 

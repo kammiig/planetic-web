@@ -4,6 +4,7 @@
         ['label' => 'Domains', 'route' => 'domains.index'],
         ['label' => 'Hosting', 'route' => 'hosting.index'],
         ['label' => 'Website Package', 'route' => 'website-package'],
+        ['label' => 'Blog', 'route' => 'blog.index'],
         ['label' => 'Contact', 'route' => 'contact'],
     ];
 @endphp
