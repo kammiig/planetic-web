@@ -9,6 +9,7 @@
         '@type' => 'Product',
         'name' => 'Complete Bespoke Website',
         'description' => 'A complete bespoke business website with a free domain and hosting for the first year, basic SEO and Cloudflare setup, built and managed by Planetic Web.',
+        'image' => asset('images/og-default.png'),
         'brand' => ['@type' => 'Brand', 'name' => config('app.name')],
         'offers' => [
             '@type' => 'Offer',
