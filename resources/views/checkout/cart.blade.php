@@ -11,8 +11,8 @@
                 <p class="text-lg font-semibold text-slate-900">Your cart is empty</p>
                 <p class="mt-1 text-slate-500">Search for a domain or choose a plan to get started.</p>
                 <div class="mt-6 flex flex-wrap justify-center gap-3">
-                    <a href="{{ route('domains.index') }}" class="btn-primary">Search a domain</a>
-                    <a href="{{ route('hosting.index') }}" class="btn-secondary">View hosting</a>
+                    <a href="{{ region()->route('domains.index') }}" class="btn-primary">Search a domain</a>
+                    <a href="{{ region()->route('hosting.index') }}" class="btn-secondary">View hosting</a>
                 </div>
             </div>
         @else
@@ -41,9 +41,9 @@
                                                 <p class="mt-1 text-sm text-success">Includes free domain &amp; hosting for the first year</p>
                                             @endif
                                         </td>
-                                        <td class="text-right font-semibold">£{{ number_format((float) $item->total, 2) }}</td>
+                                        <td class="text-right font-semibold">{{ money($item->total, $cart->currency) }}</td>
                                         <td class="text-right">
-                                            <form method="POST" action="{{ route('cart.items.destroy', $item) }}">
+                                            <form method="POST" action="{{ region()->route('cart.items.destroy', $item) }}">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="btn-secondary btn-sm" aria-label="Remove {{ $item->name }} from cart">Remove</button>
@@ -56,7 +56,7 @@
                     </div>
 
                     <div class="alert alert-info mt-6">
-                        <strong>Renewal notice.</strong> {{ $freeYearNotice }} Standard domain and hosting renewal charges apply after the first year. See our <a href="{{ route('legal.renewal') }}" class="font-semibold underline">Renewal Policy</a>.
+                        <strong>Renewal notice.</strong> {{ $freeYearNotice }} Standard domain and hosting renewal charges apply after the first year. See our <a href="{{ region()->route('legal.renewal') }}" class="font-semibold underline">Renewal Policy</a>.
                     </div>
                 </div>
 
@@ -65,17 +65,17 @@
                     <div class="card sticky top-24">
                         <h2 class="text-lg font-bold">Order summary</h2>
                         <dl class="mt-4 space-y-2 text-sm">
-                            <div class="flex justify-between"><dt class="text-slate-600">Subtotal</dt><dd class="font-medium">£{{ number_format((float) $cart->subtotal, 2) }}</dd></div>
+                            <div class="flex justify-between"><dt class="text-slate-600">Subtotal</dt><dd class="font-medium">{{ money($cart->subtotal, $cart->currency) }}</dd></div>
                             @if ((float) $cart->discount_total > 0)
-                                <div class="flex justify-between text-success"><dt>Discount</dt><dd>−£{{ number_format((float) $cart->discount_total, 2) }}</dd></div>
+                                <div class="flex justify-between text-success"><dt>Discount</dt><dd>−{{ money($cart->discount_total, $cart->currency) }}</dd></div>
                             @endif
                             <div class="mt-2 flex justify-between border-t border-slate-200 pt-3 text-base">
                                 <dt class="font-bold">Total due today</dt>
-                                <dd class="font-bold">£{{ number_format((float) $cart->total, 2) }}</dd>
+                                <dd class="font-bold">{{ money($cart->total, $cart->currency) }}</dd>
                             </div>
                         </dl>
-                        <a href="{{ route('checkout.index') }}" class="btn-primary mt-6 w-full">Continue to checkout</a>
-                        <a href="{{ route('domains.index') }}" class="mt-3 block text-center text-sm font-medium text-primary-600 hover:underline">Add another domain</a>
+                        <a href="{{ region()->route('checkout.index') }}" class="btn-primary mt-6 w-full">Continue to checkout</a>
+                        <a href="{{ region()->route('domains.index') }}" class="mt-3 block text-center text-sm font-medium text-primary-600 hover:underline">Add another domain</a>
                     </div>
                 </aside>
             </div>

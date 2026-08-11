@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\HostingPackages\Schemas;
 
 use App\Enums\ProductType;
+use App\Filament\Support\PriceFields;
 use App\Models\Product;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -55,13 +56,12 @@ class HostingPackageForm
                         TextInput::make('sort_order')->numeric()->default(0)->helperText('Lower numbers appear first.'),
                     ]),
 
-                Section::make('Pricing (GBP)')
-                    ->description('Stored on the linked product and used at checkout. Frontend updates instantly.')
+                Section::make('Pricing')
+                    ->description('Stored on the linked product and used at checkout. Frontend updates instantly. '
+                        .'Each storefront sells from its own figure — set a deliberate price per currency rather than a converted one. '
+                        .'Leave a currency blank to withdraw this plan from that storefront.')
                     ->columns(2)
-                    ->schema([
-                        TextInput::make('price_monthly')->label('Monthly price')->numeric()->prefix('£')->minValue(0)->dehydrated(false),
-                        TextInput::make('price_yearly')->label('Yearly price')->numeric()->prefix('£')->minValue(0)->dehydrated(false),
-                    ]),
+                    ->schema(PriceFields::make(['monthly' => 'Monthly price', 'yearly' => 'Yearly price'])),
 
                 Section::make('Limits & resources')
                     ->description('Leave a field blank to advertise it as unlimited / unmetered.')

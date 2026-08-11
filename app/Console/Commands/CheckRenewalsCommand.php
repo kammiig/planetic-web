@@ -29,6 +29,7 @@ class CheckRenewalsCommand extends Command
                     $service['name'],
                     $service['date']->toDateString(),
                     $service['amount'],
+                    $service['currency'] ?? null,
                     (int) $days,
                     sprintf('%s:%d:%d:%s', $service['type'], $service['id'], $days, $service['date']->toDateString()),
                 );

@@ -1,7 +1,7 @@
 @extends('layouts.public')
 
 @section('title', 'Small Business Website Design, Hosting & Domains UK')
-@section('meta_description', 'Get a complete website for your small business for £200 — bespoke design, free domain and hosting for the first year, SSL and email all set up for you. UK-based support.')
+@section('meta_description', 'Get a complete website for your small business for '.money_compact($websitePackagePrice).' — bespoke design, free domain and hosting for the first year, SSL and email all set up for you. UK-based support.')
 
 @section('content')
     {{-- ============================ Hero ============================ --}}
@@ -31,8 +31,8 @@
                     </p>
 
                     <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                        <a href="{{ route('website-package') }}" class="btn-primary w-full sm:w-auto">Get a complete website</a>
-                        <a href="{{ route('hosting.index') }}" class="btn-ghost-dark w-full sm:w-auto">View hosting plans</a>
+                        <a href="{{ region()->route('website-package') }}" class="btn-primary w-full sm:w-auto">Get a complete website</a>
+                        <a href="{{ region()->route('hosting.index') }}" class="btn-ghost-dark w-full sm:w-auto">View hosting plans</a>
                     </div>
                 </div>
 
@@ -76,9 +76,9 @@
                 @if ($featuredTlds->isNotEmpty())
                     <div class="mt-4 flex flex-wrap gap-2">
                         @foreach ($featuredTlds as $tld)
-                            <a href="{{ route('domains.index') }}" class="tld-chip">
+                            <a href="{{ region()->route('domains.index') }}" class="tld-chip">
                                 .{{ ltrim($tld->tld, '.') }}
-                                <span class="tld-chip-price">£{{ number_format($tld->register_price, 2) }}/yr</span>
+                                <span class="tld-chip-price">{{ money($tld->registerPrice()) }}/yr</span>
                             </a>
                         @endforeach
                     </div>
@@ -155,7 +155,7 @@
                 </span>
                 <h3 class="mt-4 text-xl font-bold">Register a Domain</h3>
                 <p class="mt-1 text-sm text-slate-500">Secure the perfect name for your business.</p>
-                <p class="mt-5"><span class="text-3xl font-extrabold text-slate-900">from £{{ number_format($featuredTlds->min('register_price') ?? 9.56, 2) }}</span><span class="text-slate-500">/year</span></p>
+                <p class="mt-5"><span class="text-3xl font-extrabold text-slate-900">from {{ money($cheapestTld) }}</span><span class="text-slate-500">/year</span></p>
                 <ul class="mt-5 flex-1 space-y-2.5 text-sm text-slate-600">
                     @foreach (['Instant availability search', 'Free WHOIS privacy', 'Automatic Cloudflare DNS', 'Manage everything in one dashboard'] as $point)
                         <li class="flex items-start gap-2.5">
@@ -163,7 +163,7 @@
                         </li>
                     @endforeach
                 </ul>
-                <a href="{{ route('domains.index') }}" class="btn-secondary mt-6 w-full">Search Domain</a>
+                <a href="{{ region()->route('domains.index') }}" class="btn-secondary mt-6 w-full">Search Domain</a>
             </div>
 
             {{-- Offer 2: Business hosting (free domain) --}}
@@ -177,10 +177,10 @@
                 @if ($businessMonthly || $businessYearly)
                     <div class="mt-5">
                         @if ($businessMonthly)
-                            <p x-show="cycle === 'monthly'"><span class="text-3xl font-extrabold text-slate-900">£{{ number_format($businessMonthly->amount, 2) }}</span><span class="text-slate-500">/month</span></p>
+                            <p x-show="cycle === 'monthly'"><span class="text-3xl font-extrabold text-slate-900">{{ money($businessMonthly->amount, $businessMonthly->currency) }}</span><span class="text-slate-500">/month</span></p>
                         @endif
                         @if ($businessYearly)
-                            <p x-show="cycle === 'yearly'" x-cloak><span class="text-3xl font-extrabold text-slate-900">£{{ number_format($businessYearly->amount, 2) }}</span><span class="text-slate-500">/year</span></p>
+                            <p x-show="cycle === 'yearly'" x-cloak><span class="text-3xl font-extrabold text-slate-900">{{ money($businessYearly->amount, $businessYearly->currency) }}</span><span class="text-slate-500">/year</span></p>
                         @endif
                         @if ($businessMonthly && $businessYearly)
                             <div class="mt-3 inline-flex rounded-full border border-slate-200 bg-slate-50 p-1 text-xs" role="group" aria-label="Billing cycle">
@@ -204,7 +204,7 @@
                 </ul>
 
                 @if ($businessHosting)
-                    <form method="POST" action="{{ route('cart.items.store') }}" class="mt-6">
+                    <form method="POST" action="{{ region()->route('cart.items.store') }}" class="mt-6">
                         @csrf
                         <input type="hidden" name="item_type" value="hosting">
                         <input type="hidden" name="product_id" value="{{ $businessHosting->id }}">
@@ -212,7 +212,7 @@
                         <button type="submit" class="btn-primary w-full">Choose Business Hosting</button>
                     </form>
                 @else
-                    <a href="{{ route('hosting.index') }}" class="btn-primary mt-6 w-full">Choose Business Hosting</a>
+                    <a href="{{ region()->route('hosting.index') }}" class="btn-primary mt-6 w-full">Choose Business Hosting</a>
                 @endif
             </div>
 
@@ -224,7 +224,7 @@
                 </span>
                 <h3 class="mt-4 text-xl font-bold text-white">Complete Bespoke Website</h3>
                 <p class="mt-1 text-sm text-slate-300">Everything done for you — domain, hosting & website.</p>
-                <p class="mt-5"><span class="text-4xl font-extrabold text-white">£{{ number_format($websitePackagePrice, 0) }}</span><span class="text-slate-300"> one-time</span></p>
+                <p class="mt-5"><span class="text-4xl font-extrabold text-white">{{ money_compact($websitePackagePrice) }}</span><span class="text-slate-300"> one-time</span></p>
                 <p class="mt-1 text-sm font-medium text-accent-cyan">{{ $freeYearNotice }}</p>
 
                 <ul class="mt-5 flex-1 space-y-2.5 text-sm text-slate-200">
@@ -235,7 +235,7 @@
                     @endforeach
                 </ul>
 
-                <a href="{{ route('website-package') }}" class="btn-primary mt-6 w-full">Get Complete Website</a>
+                <a href="{{ region()->route('website-package') }}" class="btn-primary mt-6 w-full">Get Complete Website</a>
             </div>
         </div>
     </section>
@@ -249,9 +249,9 @@
             </div>
             <div class="mt-12 grid gap-6 md:grid-cols-3">
                 @foreach ([
-                    ['Domains', 'Search and register your domain with WHOIS privacy and automatic Cloudflare DNS.', route('domains.index'), 'M3 12h18M12 3a15 15 0 0 1 0 18M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z'],
-                    ['Hosting', 'Fast, secure cPanel hosting with free SSL — provisioned automatically.', route('hosting.index'), 'M3 5h18v6H3zM3 13h18v6H3zM7 8h.01M7 16h.01'],
-                    ['£200 Website', 'A complete bespoke website with free domain and hosting for the first year.', route('website-package'), 'M4 4h16v12H4zM2 20h20'],
+                    ['Domains', 'Search and register your domain with WHOIS privacy and automatic Cloudflare DNS.', region()->route('domains.index'), 'M3 12h18M12 3a15 15 0 0 1 0 18M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z'],
+                    ['Hosting', 'Fast, secure cPanel hosting with free SSL — provisioned automatically.', region()->route('hosting.index'), 'M3 5h18v6H3zM3 13h18v6H3zM7 8h.01M7 16h.01'],
+                    [money_compact($websitePackagePrice).' Website', 'A complete bespoke website with free domain and hosting for the first year.', region()->route('website-package'), 'M4 4h16v12H4zM2 20h20'],
                 ] as [$title, $desc, $href, $icon])
                     <a href="{{ $href }}" class="card lift">
                         <span class="grid h-12 w-12 place-items-center rounded-[14px] bg-primary-50 text-primary-600" aria-hidden="true">
@@ -345,10 +345,10 @@
         <div class="container-px relative section text-center">
             <div class="mx-auto max-w-2xl">
                 <h2 class="text-3xl font-bold sm:text-4xl">{{ setting('cta.title', 'Ready to get online?') }}</h2>
-                <p class="mx-auto mt-4 max-w-xl text-lg text-slate-300">{{ setting('cta.subtitle', 'Search your domain or start your £200 complete website today.') }}</p>
+                <p class="mx-auto mt-4 max-w-xl text-lg text-slate-300">{{ setting('cta.subtitle', 'Search your domain or start your '.money_compact($websitePackagePrice).' complete website today.') }}</p>
                 <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                    <a href="{{ route('domains.index') }}" class="btn-primary w-full sm:w-auto">Search a domain</a>
-                    <a href="{{ route('website-package') }}" class="btn-ghost-dark w-full sm:w-auto">Get a website</a>
+                    <a href="{{ region()->route('domains.index') }}" class="btn-primary w-full sm:w-auto">Search a domain</a>
+                    <a href="{{ region()->route('website-package') }}" class="btn-ghost-dark w-full sm:w-auto">Get a website</a>
                 </div>
             </div>
         </div>

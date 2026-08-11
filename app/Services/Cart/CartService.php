@@ -10,6 +10,7 @@ use App\Models\CartItem;
 use App\Models\Product;
 use App\Models\TldPricing;
 use App\Support\DomainName;
+use App\Support\Region;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -43,10 +44,15 @@ class CartService
         }
 
         if (! $cart) {
+            // The currency is LOCKED here, from the storefront the visitor was
+            // browsing when the cart came into existence, and is never
+            // recalculated afterwards. Switching region mid-session must not
+            // move the price of something already in the basket — and checkout
+            // reads this stored currency rather than the current URL.
             $cart = Cart::create([
                 'user_id' => Auth::id(),
                 'session_id' => session()->getId(),
-                'currency' => 'GBP',
+                'currency' => Region::current()->currency(),
             ]);
         }
 
@@ -73,7 +79,9 @@ class CartService
 
         $this->guardDuplicates($cart, $type, $domainName);
 
-        [$product, $price, $name, $unitPrice, $billingCycle] = $this->resolvePricing($type, $data, $domainName);
+        // Price in the CART's currency, not the current request's — the two can
+        // differ if the visitor switched storefronts after starting a basket.
+        [$product, $price, $name, $unitPrice, $billingCycle] = $this->resolvePricing($type, $data, $domainName, $cart->currency);
 
         $item = $cart->items()->create([
             'product_id' => $product?->id,
@@ -174,22 +182,31 @@ class CartService
     /**
      * @return array{0: ?Product, 1: ?\App\Models\ProductPrice, 2: string, 3: float, 4: ?string}
      */
-    private function resolvePricing(ItemType $type, array $data, ?string $domainName): array
+    private function resolvePricing(ItemType $type, array $data, ?string $domainName, string $currency): array
     {
         return match ($type) {
-            ItemType::WebsitePackage => $this->websitePackagePricing($domainName),
-            ItemType::Hosting => $this->hostingPricing($data),
-            ItemType::DomainRegistration => $this->domainPricing($domainName),
+            ItemType::WebsitePackage => $this->websitePackagePricing($domainName, $currency),
+            ItemType::Hosting => $this->hostingPricing($data, $currency),
+            ItemType::DomainRegistration => $this->domainPricing($domainName, $currency),
             default => throw ValidationException::withMessages([
                 'item_type' => 'That item cannot be added to the cart.',
             ]),
         };
     }
 
-    private function websitePackagePricing(?string $domainName): array
+    private function websitePackagePricing(?string $domainName, string $currency): array
     {
         $product = Product::ofType(ProductType::WebsitePackage)->active()->with('activePrices')->first();
-        $price = $product?->priceFor('one_time');
+        $price = $product?->priceFor('one_time', $currency);
+
+        // The configured package price is a GBP figure, so it is only a safe
+        // fallback for the GBP storefront. Elsewhere an unpriced product is
+        // genuinely unavailable rather than silently sold at the GBP number.
+        if (! $price && strtoupper($currency) !== 'GBP') {
+            throw ValidationException::withMessages([
+                'item_type' => 'The website package is not available in '.strtoupper($currency).' yet.',
+            ]);
+        }
 
         $name = 'Complete Bespoke Website';
         if ($domainName) {
@@ -199,7 +216,7 @@ class CartService
         return [$product, $price, $name, (float) ($price?->amount ?? config('billing.website_package.price')), 'one_time'];
     }
 
-    private function hostingPricing(array $data): array
+    private function hostingPricing(array $data, string $currency): array
     {
         $product = Product::ofType(ProductType::Hosting)->active()->with('activePrices')->find($data['product_id'] ?? null);
 
@@ -212,7 +229,7 @@ class CartService
             $cycle = 'monthly';
         }
 
-        $price = $product->priceFor($cycle);
+        $price = $product->priceFor($cycle, $currency);
 
         if (! $price) {
             throw ValidationException::withMessages(['billing_cycle' => 'That billing cycle is not available for this plan.']);
@@ -221,19 +238,31 @@ class CartService
         return [$product, $price, $product->name.' ('.$cycle.')', (float) $price->amount, $cycle];
     }
 
-    private function domainPricing(?string $domainName): array
+    private function domainPricing(?string $domainName, string $currency): array
     {
         if (! $domainName || ! DomainName::isValid($domainName)) {
             throw ValidationException::withMessages(['domain_name' => 'Please provide a valid domain name.']);
         }
 
         $product = Product::ofType(ProductType::Domain)->active()->with('activePrices')->first();
-        $price = $product?->priceFor('yearly');
+        $price = $product?->priceFor('yearly', $currency);
 
         // The customer-facing charge comes from the admin TLD price book
         // (per-TLD), falling back to the flat catalogue price when unlisted.
-        $unitPrice = TldPricing::priceForDomain($domainName)
-            ?? (float) ($price?->amount ?? 12.99);
+        $unitPrice = TldPricing::priceForDomain($domainName, $currency)
+            ?? ($price ? (float) $price->amount : null);
+
+        if ($unitPrice === null) {
+            // Only GBP has a hardcoded last-resort price; quoting it under a
+            // different symbol would undercharge by the exchange rate.
+            if (strtoupper($currency) !== 'GBP') {
+                throw ValidationException::withMessages([
+                    'domain_name' => 'That domain extension is not available in '.strtoupper($currency).' yet.',
+                ]);
+            }
+
+            $unitPrice = 12.99;
+        }
 
         return [$product, $price, 'Domain registration: '.$domainName, $unitPrice, 'yearly'];
     }
@@ -419,7 +448,19 @@ class CartService
         $free = $this->domainIsFree($cart);
         $existing = $cart->items->firstWhere('item_type', ItemType::DomainRegistration);
 
-        [$product, $price, , $unitPrice] = $this->domainPricing($domain);
+        // A free first-year domain costs nothing, so it can be added even for a
+        // TLD this storefront does not otherwise publish a price for — pricing
+        // it would only fail for an amount that is never charged.
+        try {
+            [$product, $price, , $unitPrice] = $this->domainPricing($domain, $cart->currency);
+        } catch (ValidationException $e) {
+            if (! $free) {
+                throw $e;
+            }
+
+            [$product, $price, $unitPrice] = [null, null, 0.0];
+        }
+
         $unitPrice = $free ? 0.0 : $unitPrice;
         $name = 'Domain registration: '.$domain.($free ? ' (free first year)' : '');
 

@@ -37,7 +37,7 @@ class SiteSettingSeeder extends Seeder
             ['group' => 'hero', 'key' => 'hero.eyebrow', 'label' => 'Eyebrow text', 'value' => 'Premium Hosting, Domains & Websites'],
             ['group' => 'hero', 'key' => 'hero.title', 'label' => 'Headline', 'value' => 'Your website, domain & hosting — done for you.'],
             ['group' => 'hero', 'key' => 'hero.subtitle', 'type' => 'textarea', 'label' => 'Sub-headline', 'value' => 'Search a domain, choose a plan, and let Planetic Web register, host and configure everything automatically. Secure billing, DNS and support in one dashboard.'],
-            ['group' => 'hero', 'key' => 'hero.cta_primary', 'label' => 'Primary button label', 'value' => 'Get a Website for £200'],
+            ['group' => 'hero', 'key' => 'hero.cta_primary', 'label' => 'Primary button label', 'value' => 'Get a Website for :price'],
             ['group' => 'hero', 'key' => 'hero.cta_secondary', 'label' => 'Secondary button label', 'value' => 'View Hosting Plans'],
 
             // ---- Trust badges ----
@@ -59,7 +59,7 @@ class SiteSettingSeeder extends Seeder
             ['group' => 'sections', 'key' => 'testimonials.title', 'label' => 'Testimonials title', 'value' => 'Trusted by businesses across the UK'],
             ['group' => 'sections', 'key' => 'faq.title', 'label' => 'FAQ title', 'value' => 'Frequently asked questions'],
             ['group' => 'sections', 'key' => 'cta.title', 'label' => 'Final CTA title', 'value' => 'Ready to get online?'],
-            ['group' => 'sections', 'key' => 'cta.subtitle', 'type' => 'textarea', 'label' => 'Final CTA subtitle', 'value' => 'Search your domain or start your £200 website today.'],
+            ['group' => 'sections', 'key' => 'cta.subtitle', 'type' => 'textarea', 'label' => 'Final CTA subtitle', 'value' => 'Search your domain or start your :price website today.'],
 
             // ---- Domain search section ----
             ['group' => 'domains', 'key' => 'domains.title', 'label' => 'Domain search title', 'value' => 'Find your perfect domain name'],

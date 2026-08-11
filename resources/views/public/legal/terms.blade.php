@@ -17,7 +17,7 @@
         </ul>
 
         <h2>Payment &amp; renewals</h2>
-        <p>Prices are shown in GBP and calculated at checkout. Services renew as described in our <a href="{{ route('legal.renewal') }}">Renewal Policy</a>. The £{{ number_format(config('billing.website_package.price'), 0) }} website package includes a free domain and hosting for the first year only; renewal charges apply afterwards.</p>
+        <p>Prices are shown in {{ region()->currency() }} and calculated at checkout. Services renew as described in our <a href="{{ region()->route('legal.renewal') }}">Renewal Policy</a>. The {{ money_compact($websitePackagePrice) }} website package includes a free domain and hosting for the first year only; renewal charges apply afterwards.</p>
 
         <h2>Acceptable use</h2>
         <p>You must not use our services for unlawful, abusive, or harmful activity, or in a way that disrupts our infrastructure or other customers.</p>

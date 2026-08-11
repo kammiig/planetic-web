@@ -19,7 +19,7 @@
         @else
             <div class="mx-auto grid max-w-6xl gap-6 md:grid-cols-2 lg:grid-cols-3">
                 @foreach ($posts as $post)
-                    <a href="{{ route('blog.show', $post->slug) }}" class="offer-card group">
+                    <a href="{{ region()->route('blog.show', $post->slug) }}" class="offer-card group">
                         <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <time datetime="{{ $post->published_at?->toDateString() }}">{{ $post->published_at?->format('j M Y') }}</time>
                             · {{ $post->readingMinutes() }} min read
@@ -52,8 +52,8 @@
     <section class="bg-slate-50">
         <div class="container-px section text-center">
             <h2 class="text-2xl font-bold sm:text-3xl">Need a website without the hassle?</h2>
-            <p class="mx-auto mt-3 max-w-xl text-slate-600">A complete bespoke website for £200, with a free domain and hosting for the first year.</p>
-            <a href="{{ route('website-package') }}" class="btn-primary mt-6 inline-flex">See the £200 website package</a>
+            <p class="mx-auto mt-3 max-w-xl text-slate-600">A complete bespoke website for {{ money_compact($websitePackagePrice) }}, with a free domain and hosting for the first year.</p>
+            <a href="{{ region()->route('website-package') }}" class="btn-primary mt-6 inline-flex">See the {{ money_compact($websitePackagePrice) }} website package</a>
         </div>
     </section>
 @endsection

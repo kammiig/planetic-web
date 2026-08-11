@@ -1,8 +1,23 @@
 @php
     use App\Enums\ItemType;
+    use App\Support\Region;
+
     $subtotal = $lineItems->sum(fn ($i) => (float) $i->total);
-    $vat = max(0, (float) $total - $subtotal);
     $showPay = $showPay ?? false;
+
+    // The order/cart's own currency — locked when the basket was created, so
+    // switching storefront mid-session never re-prices a pending order.
+    $currency = $currency ?? Region::current()->currency();
+
+    // The region whose tax rules apply to this sale, matched by the currency
+    // being charged rather than the page being viewed.
+    $taxRegion = collect(Region::all())->first(fn ($r) => $r->currency() === strtoupper($currency))
+        ?? Region::current();
+
+    // Tax contained in the (tax-inclusive) total. Shown ONLY when the business
+    // is actually registered for it: a "VAT 0.00" line implies a registration
+    // that does not exist, so the row is omitted entirely instead.
+    $tax = $taxRegion->taxOn((float) $total);
 @endphp
 
 <div class="overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-soft lg:sticky lg:top-24">
@@ -27,7 +42,7 @@
                             <p class="mt-0.5 text-sm text-slate-500">Managed cPanel hosting</p>
                         @endif
                     </div>
-                    <p class="whitespace-nowrap font-semibold text-slate-900">£{{ number_format((float) $item->total, 2) }}</p>
+                    <p class="whitespace-nowrap font-semibold text-slate-900">{{ money($item->total, $currency) }}</p>
                 </li>
             @endforeach
         </ul>
@@ -36,18 +51,20 @@
     <div class="space-y-2 border-t border-slate-200 px-5 py-4 text-sm">
         <div class="flex justify-between text-slate-600">
             <span>Subtotal</span>
-            <span class="font-medium text-slate-900">£{{ number_format($subtotal, 2) }}</span>
+            <span class="font-medium text-slate-900">{{ money($subtotal, $currency) }}</span>
         </div>
-        <div class="flex justify-between text-slate-600">
-            <span>VAT</span>
-            <span class="font-medium text-slate-900">£{{ number_format($vat, 2) }}</span>
-        </div>
+        @if ($taxRegion->chargesTax())
+            <div class="flex justify-between text-slate-600">
+                <span>{{ $taxRegion->taxLabel() }} @if ($taxRegion->taxInclusive())<span class="text-xs text-slate-400">(included)</span>@endif</span>
+                <span class="font-medium text-slate-900">{{ money($tax, $currency) }}</span>
+            </div>
+        @endif
     </div>
 
     <div class="border-t border-slate-200 px-5 py-4">
         <div class="flex items-center justify-between">
             <span class="text-lg font-bold">Total due today</span>
-            <span class="text-2xl font-extrabold">£{{ number_format((float) $total, 2) }}</span>
+            <span class="text-2xl font-extrabold">{{ money($total, $currency) }}</span>
         </div>
 
         @if ($showPay)
@@ -57,7 +74,7 @@
                     class="btn-primary mt-4 w-full">
                 <span x-show="!paying" class="inline-flex items-center gap-2">
                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    <span x-show="!isFree">Pay £{{ number_format((float) $total, 2) }} now</span>
+                    <span x-show="!isFree">Pay {{ money($total, $currency) }} now</span>
                     <span x-show="isFree" x-cloak>Complete order</span>
                 </span>
                 <span x-show="paying" x-cloak class="inline-flex items-center gap-2">

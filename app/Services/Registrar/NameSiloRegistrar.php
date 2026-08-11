@@ -96,6 +96,7 @@ class NameSiloRegistrar implements RegistrarInterface
         return [
             'domain' => $params['domain'],
             'success' => true,
+            'registrar' => $this->name(),
             'registrar_domain_id' => $reply['domain_id'] ?? null,
             'registrar_order_id' => isset($reply['order_id']) ? (string) $reply['order_id'] : null,
             'order_amount' => isset($reply['order_amount']) ? (string) $reply['order_amount'] : null,

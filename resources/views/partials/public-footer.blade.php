@@ -39,27 +39,27 @@
         <div>
             <h2 class="text-sm font-semibold text-white">Services</h2>
             <ul class="mt-4 space-y-2 text-sm">
-                <li><a class="hover:text-white" href="{{ route('website-package') }}">Website Package</a></li>
-                <li><a class="hover:text-white" href="{{ route('hosting.index') }}">Hosting Plans</a></li>
-                <li><a class="hover:text-white" href="{{ route('domains.index') }}">Domain Search</a></li>
-                <li><a class="hover:text-white" href="{{ route('blog.index') }}">Blog</a></li>
+                <li><a class="hover:text-white" href="{{ region()->route('website-package') }}">Website Package</a></li>
+                <li><a class="hover:text-white" href="{{ region()->route('hosting.index') }}">Hosting Plans</a></li>
+                <li><a class="hover:text-white" href="{{ region()->route('domains.index') }}">Domain Search</a></li>
+                <li><a class="hover:text-white" href="{{ region()->route('blog.index') }}">Blog</a></li>
             </ul>
         </div>
 
         <div>
             <h2 class="text-sm font-semibold text-white">Legal</h2>
             <ul class="mt-4 space-y-2 text-sm">
-                <li><a class="hover:text-white" href="{{ route('legal.privacy') }}">Privacy Policy</a></li>
-                <li><a class="hover:text-white" href="{{ route('legal.terms') }}">Terms of Use</a></li>
-                <li><a class="hover:text-white" href="{{ route('legal.renewal') }}">Renewal Policy</a></li>
-                <li><a class="hover:text-white" href="{{ route('legal.refund') }}">Refund Policy</a></li>
+                <li><a class="hover:text-white" href="{{ region()->route('legal.privacy') }}">Privacy Policy</a></li>
+                <li><a class="hover:text-white" href="{{ region()->route('legal.terms') }}">Terms of Use</a></li>
+                <li><a class="hover:text-white" href="{{ region()->route('legal.renewal') }}">Renewal Policy</a></li>
+                <li><a class="hover:text-white" href="{{ region()->route('legal.refund') }}">Refund Policy</a></li>
             </ul>
         </div>
 
         <div>
             <h2 class="text-sm font-semibold text-white">Contact</h2>
             <ul class="mt-4 space-y-2 text-sm">
-                <li><a class="hover:text-white" href="{{ route('contact') }}">Contact Us</a></li>
+                <li><a class="hover:text-white" href="{{ region()->route('contact') }}">Contact Us</a></li>
                 @if ($email = setting('contact.email', 'support@planeticweb.com'))
                     <li><a class="hover:text-white" href="mailto:{{ $email }}">{{ $email }}</a></li>
                 @endif
@@ -83,6 +83,7 @@
                 <span class="badge badge-info"><span class="badge-dot"></span> SSL Secured</span>
                 <span class="badge badge-primary"><span class="badge-dot"></span> Cloudflare</span>
             </p>
+            <div class="text-slate-300">@include('partials.region-selector')</div>
         </div>
     </div>
 </footer>

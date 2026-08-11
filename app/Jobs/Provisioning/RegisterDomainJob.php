@@ -122,9 +122,14 @@ class RegisterDomainJob extends ProvisioningStepJob
 
         $expiry = $result['expiry_date'] ? Carbon::parse($result['expiry_date']) : now()->addYear();
 
+        // The result names whoever actually registered the domain — the primary
+        // registrar may have routed it to the fallback (e.g. a .co.uk that
+        // Cloudflare's API beta cannot take), and the record must say so.
+        $registeredBy = $result['registrar'] ?? $registrar->name();
+
         $domain->update([
             'status' => DomainStatus::Active->value,
-            'registrar' => $registrar->name(),
+            'registrar' => $registeredBy,
             'registrar_domain_id' => $result['registrar_domain_id'] ?? $result['domain'] ?? $domainName,
             'registrar_order_id' => $result['registrar_order_id'] ?? null,
             'registration_date' => now()->toDateString(),
@@ -135,7 +140,7 @@ class RegisterDomainJob extends ProvisioningStepJob
         Log::channel('stack')->info('Domain registered.', [
             'order' => $order->order_number,
             'domain' => $domainName,
-            'registrar' => $registrar->name(),
+            'registrar' => $registeredBy,
             'registrar_order_id' => $result['registrar_order_id'] ?? null,
             'expiry_date' => $expiry->toDateString(),
         ]);

@@ -17,6 +17,7 @@ class RenewalReminderMail extends Mailable
         public string $serviceName,
         public string $renewalDate,
         public ?float $amount,
+        public ?string $currency,
         public int $daysBefore,
     ) {}
 
@@ -32,6 +33,7 @@ class RenewalReminderMail extends Mailable
             'serviceName' => $this->serviceName,
             'renewalDate' => $this->renewalDate,
             'amount' => $this->amount,
+            'currency' => $this->currency,
             'daysBefore' => $this->daysBefore,
         ]);
     }

@@ -11,7 +11,7 @@
 # cPanel locations — adjust if your host differs (check with `which php`).
 deployment:
   tasks:
-    - /usr/local/bin/php /opt/cpanel/composer/bin/composer install --no-dev --optimize-autoloader --no-interaction
+    - /bin/bash -c 'C=/opt/cpanel/composer/bin/composer; [ -f "$C" ] || C=$(command -v composer); [ -n "$C" ] && /usr/local/bin/php "$C" install --no-dev --optimize-autoloader --no-interaction || echo "composer not found — skipped"'
     - /usr/local/bin/php artisan migrate --force
     - /usr/local/bin/php artisan optimize:clear
     - /usr/local/bin/php artisan config:cache

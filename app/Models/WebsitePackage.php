@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Region;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -46,10 +47,23 @@ class WebsitePackage extends Model
         return $query->where('is_active', true);
     }
 
-    /** One-time price from the linked product, falling back to config. */
-    public function price(): float
+    /**
+     * One-time price from the linked product, in a currency (defaults to the
+     * current storefront's).
+     *
+     * The config fallback is a GBP figure, so it only applies to the GBP
+     * storefront — quoting 200 under a "$" would undercharge by the exchange
+     * rate. Elsewhere an unpriced package returns null and is not on sale.
+     */
+    public function price(?string $currency = null): ?float
     {
-        return (float) ($this->product?->priceFor('one_time')?->amount
-            ?? config('billing.website_package.price', 200.00));
+        $currency = strtoupper($currency ?: Region::current()->currency());
+        $amount = $this->product?->priceFor('one_time', $currency)?->amount;
+
+        if ($amount !== null) {
+            return (float) $amount;
+        }
+
+        return $currency === 'GBP' ? (float) config('billing.website_package.price', 200.00) : null;
     }
 }

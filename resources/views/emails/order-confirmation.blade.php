@@ -6,12 +6,12 @@
         @foreach ($order->items as $item)
             <tr>
                 <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;">{{ $item->name }}@if ($item->domain_name)<br><span style="color:#64748b;font-size:13px;">{{ $item->domain_name }}</span>@endif</td>
-                <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">£{{ number_format((float) $item->total, 2) }}</td>
+                <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">{{ money($item->total, $order->currency, true) }}</td>
             </tr>
         @endforeach
         <tr>
             <td style="padding:12px 16px;font-weight:700;">Total paid</td>
-            <td style="padding:12px 16px;text-align:right;font-weight:700;">£{{ number_format((float) $order->total, 2) }}</td>
+            <td style="padding:12px 16px;text-align:right;font-weight:700;">{{ money($order->total, $order->currency, true) }}</td>
         </tr>
     </table>
 

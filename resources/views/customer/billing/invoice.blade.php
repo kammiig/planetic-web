@@ -28,19 +28,19 @@
                     @forelse ($invoice->order?->items ?? [] as $item)
                         <tr>
                             <td>{{ $item->name }}@if ($item->domain_name)<span class="block text-sm text-slate-500">{{ $item->domain_name }}</span>@endif</td>
-                            <td class="text-right">£{{ number_format((float) $item->total, 2) }}</td>
+                            <td class="text-right">{{ money($item->total, $invoice->currency) }}</td>
                         </tr>
                     @empty
-                        <tr><td>{{ $invoice->order?->order_number ?? 'Service' }}</td><td class="text-right">£{{ number_format((float) $invoice->subtotal, 2) }}</td></tr>
+                        <tr><td>{{ $invoice->order?->order_number ?? 'Service' }}</td><td class="text-right">{{ money($invoice->subtotal, $invoice->currency) }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
         <dl class="mt-6 ml-auto max-w-xs space-y-2 text-sm">
-            <div class="flex justify-between"><dt class="text-slate-600">Subtotal</dt><dd>£{{ number_format((float) $invoice->subtotal, 2) }}</dd></div>
-            <div class="flex justify-between border-t border-slate-200 pt-2 text-base font-bold"><dt>Total</dt><dd>£{{ number_format((float) $invoice->total, 2) }}</dd></div>
-            <div class="flex justify-between text-success"><dt>Paid</dt><dd>£{{ number_format((float) $invoice->amount_paid, 2) }}</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-600">Subtotal</dt><dd>{{ money($invoice->subtotal, $invoice->currency) }}</dd></div>
+            <div class="flex justify-between border-t border-slate-200 pt-2 text-base font-bold"><dt>Total</dt><dd>{{ money($invoice->total, $invoice->currency, true) }}</dd></div>
+            <div class="flex justify-between text-success"><dt>Paid</dt><dd>{{ money($invoice->amount_paid, $invoice->currency) }}</dd></div>
         </dl>
     </div>
 @endsection

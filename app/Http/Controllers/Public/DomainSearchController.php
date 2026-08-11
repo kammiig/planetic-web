@@ -7,6 +7,7 @@ use App\Exceptions\RegistrarException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DomainSearchRequest;
 use App\Models\TldPricing;
+use App\Support\Region;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
@@ -15,11 +16,20 @@ class DomainSearchController extends Controller
 {
     public function index(): View
     {
+        $currency = Region::current()->currency();
+
+        // TLDs with no price in this storefront's currency are withheld rather
+        // than listed at 0.00 — .co.uk is a UK-only name with no USD price.
+        $sellable = fn ($query) => $query->orderBy('sort_order')->get()
+            ->filter(fn (TldPricing $t) => $t->availableIn($currency))
+            ->values();
+
         return view('public.domain-search', [
-            'websitePackagePrice' => (float) config('billing.website_package.price', 200),
+            // Supplied by RegionViewServiceProvider in this storefront's
+            // currency; null when the package is not sold here.
             'freeYearNotice' => config('billing.website_package.free_year_notice'),
-            'featuredTlds' => TldPricing::active()->where('is_featured', true)->orderBy('sort_order')->get(),
-            'tldPrices' => TldPricing::active()->orderBy('sort_order')->get(),
+            'featuredTlds' => $sellable(TldPricing::active()->where('is_featured', true)),
+            'tldPrices' => $sellable(TldPricing::active()),
         ]);
     }
 

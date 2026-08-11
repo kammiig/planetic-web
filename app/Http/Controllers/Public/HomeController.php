@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Testimonial;
 use App\Models\TldPricing;
 use App\Models\WebsitePackage;
+use App\Support\Region;
 
 class HomeController extends Controller
 {
@@ -38,11 +39,22 @@ class HomeController extends Controller
             'hostingPlans' => $hostingPlans,
             'businessHosting' => $businessHosting,
             'websitePackage' => $websitePackage,
-            'websitePackagePrice' => $websitePackage?->price() ?? config('billing.website_package.price'),
+            // price() already refuses to quote the GBP config figure under
+            // another currency, so this is null when the package is not sold
+            // in this storefront.
+            'websitePackagePrice' => $websitePackage?->price(),
             'freeYearNotice' => config('billing.website_package.free_year_notice'),
             'testimonials' => Testimonial::active()->orderBy('sort_order')->get(),
             'faqs' => Faq::active()->forPage('home')->orderBy('sort_order')->get(),
-            'featuredTlds' => TldPricing::active()->where('is_featured', true)->orderBy('sort_order')->take(6)->get(),
+            // A TLD with no price in this storefront's currency is withheld
+            // rather than shown at 0.00 — .co.uk carries no USD price.
+            'featuredTlds' => TldPricing::active()
+                ->where('is_featured', true)
+                ->orderBy('sort_order')
+                ->get()
+                ->filter(fn (TldPricing $t) => $t->availableIn(Region::current()->currency()))
+                ->take(6)
+                ->values(),
         ]);
     }
 }

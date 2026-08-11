@@ -221,4 +221,134 @@ class RegistrarResponseParser
             'currency' => 'USD',
         ];
     }
+
+    /**
+     * Assert a Cloudflare API response succeeded and return its `result` node.
+     * Cloudflare always answers with {success, errors[], messages[], result}.
+     *
+     * @param  array<string, mixed>  $json
+     * @return array<string, mixed>
+     */
+    public function cloudflareReply(array $json, string $operation): array
+    {
+        if (! filter_var($json['success'] ?? false, FILTER_VALIDATE_BOOL)) {
+            $error = $json['errors'][0] ?? null;
+            $message = is_array($error) ? (string) ($error['message'] ?? 'unknown error') : 'unknown error';
+            $hint = $this->cloudflareHint($message);
+
+            throw new RegistrarException(
+                "Cloudflare Registrar {$operation} failed: {$message}".($hint ? " — {$hint}" : ''),
+                registrar: 'cloudflare',
+                context: $json,
+            );
+        }
+
+        $result = $json['result'] ?? [];
+
+        return is_array($result) ? $result : [];
+    }
+
+    /**
+     * Interpret a Cloudflare domain-check result for a specific domain.
+     *
+     * Cloudflare returns {name, registrable, tier, pricing:{currency,
+     * registration_cost, renewal_cost}} and, when it cannot offer the name,
+     * {registrable:false, reason:"…"}. The critical distinction is between
+     * "this name is taken" (a real answer) and "the API beta does not support
+     * this extension yet" (no answer at all) — the latter must NOT be reported
+     * as unavailable, or a perfectly registrable domain would be refused at
+     * checkout. It is raised as fallback-eligible so the order routes to the
+     * secondary registrar instead.
+     *
+     * @param  array<string, mixed>  $result
+     * @return array{domain: string, available: bool, premium: bool, price: ?string, currency: string}
+     */
+    public function cloudflareAvailability(array $result, string $domain): array
+    {
+        $domain = strtolower($domain);
+        $node = null;
+
+        foreach ((array) ($result['domains'] ?? []) as $candidate) {
+            if (is_array($candidate) && strtolower((string) ($candidate['name'] ?? '')) === $domain) {
+                $node = $candidate;
+                break;
+            }
+        }
+
+        if ($node === null) {
+            // Never allow checkout on an indeterminate availability answer.
+            throw new RegistrarException(
+                "Cloudflare availability for {$domain} was indeterminate.",
+                registrar: 'cloudflare',
+                context: $result,
+            );
+        }
+
+        $registrable = filter_var($node['registrable'] ?? false, FILTER_VALIDATE_BOOL);
+        $reason = strtolower(trim((string) ($node['reason'] ?? '')));
+
+        if (! $registrable && $this->cloudflareReasonIsProviderLimit($reason)) {
+            throw new RegistrarException(
+                "Cloudflare Registrar cannot register {$domain} through its API (reason: {$reason}). "
+                .'This TLD is outside the Registrar API beta — the domain is being routed to the fallback registrar.',
+                registrar: 'cloudflare',
+                context: $node,
+                fallbackEligible: true,
+            );
+        }
+
+        $pricing = is_array($node['pricing'] ?? null) ? $node['pricing'] : [];
+
+        return [
+            'domain' => $domain,
+            'available' => $registrable,
+            'premium' => strtolower((string) ($node['tier'] ?? 'standard')) !== 'standard',
+            'price' => isset($pricing['registration_cost']) ? (string) $pricing['registration_cost'] : null,
+            'currency' => (string) ($pricing['currency'] ?? 'USD'),
+        ];
+    }
+
+    /**
+     * Whether a Cloudflare `reason` means "we cannot serve this at all" (route
+     * to the fallback registrar) rather than "this name is taken" (a real no).
+     */
+    private function cloudflareReasonIsProviderLimit(string $reason): bool
+    {
+        if ($reason === '') {
+            return false;
+        }
+
+        return $reason === CloudflareRegistrar::REASON_EXTENSION_UNSUPPORTED
+            || str_contains($reason, 'not_supported')
+            || str_contains($reason, 'unsupported')
+            || str_contains($reason, 'not_available_via_api');
+    }
+
+    /**
+     * Plain-English admin guidance for the Cloudflare Registrar failures we
+     * expect. Shown in the provisioning monitor and admin alerts — never to
+     * customers.
+     */
+    public function cloudflareHint(string $message, ?int $status = null): ?string
+    {
+        $message = strtolower($message);
+
+        return match (true) {
+            $status === 401 || $status === 403 || str_contains($message, 'authentication') || str_contains($message, 'unauthor') || str_contains($message, 'invalid token')
+                => 'Cloudflare rejected the API token. Check CLOUDFLARE_REGISTRAR_API_TOKEN in the server .env and confirm the token grants "Registrar" write on this account.',
+            str_contains($message, 'payment') || str_contains($message, 'card') || str_contains($message, 'billing')
+                => 'Cloudflare could not charge the account\'s default payment method. Add or update the card in the Cloudflare dashboard (Billing), then retry the step.',
+            str_contains($message, 'not_supported') || str_contains($message, 'unsupported extension')
+                => 'This TLD is not registrable through the Cloudflare Registrar API beta. Set DEFAULT_REGISTRAR=porkbun for this TLD, or leave the fallback registrar enabled so such domains route automatically.',
+            str_contains($message, 'premium')
+                => 'Cloudflare flagged this as a premium name, which needs an explicit fee acknowledgement. Register premium domains manually in the Cloudflare dashboard.',
+            str_contains($message, 'contact') || str_contains($message, 'registrant') || str_contains($message, 'postal') || str_contains($message, 'phone')
+                => 'Cloudflare rejected the registrant contact. Ensure the customer has a full name, a dotted international phone (e.g. +44.2079460000), street, city, postal code and a 2-letter country code.',
+            str_contains($message, 'not available') || str_contains($message, 'taken') || str_contains($message, 'registered')
+                => 'The domain is no longer available to register — agree a different domain with the customer, update the order, and retry.',
+            $status === 429 || str_contains($message, 'rate limit')
+                => 'Cloudflare rate-limited the request. This is transient — retry the step shortly.',
+            default => null,
+        };
+    }
 }

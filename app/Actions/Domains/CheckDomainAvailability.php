@@ -8,13 +8,17 @@ use App\Models\Product;
 use App\Models\TldPricing;
 use App\Services\Registrar\RegistrarInterface;
 use App\Support\DomainName;
+use App\Support\Region;
 use Illuminate\Support\Facades\Cache;
 
 /**
  * Orchestrates a domain availability search: validates the name, asks the
- * configured registrar, prices it from our own GBP catalogue (never from the
- * registrar's raw, possibly-USD figure), and — when taken — offers a few
- * available alternatives on common TLDs.
+ * configured registrar, prices it from our own catalogue in the current
+ * storefront's currency (never from the registrar's raw wholesale figure), and
+ * — when taken — offers a few available alternatives on common TLDs.
+ *
+ * TLDs the storefront does not price in its own currency are omitted from
+ * suggestions rather than quoted at a converted rate.
  */
 class CheckDomainAvailability
 {
@@ -32,6 +36,7 @@ class CheckDomainAvailability
         $domain = DomainName::normalise($domain);
         $result = $this->lookup($domain);
         $price = $this->priceForDomain($domain);
+        $region = Region::current();
 
         return [
             'success' => true,
@@ -39,7 +44,8 @@ class CheckDomainAvailability
             'available' => $result['available'],
             'premium' => $result['premium'],
             'price' => $result['available'] ? $price : null,
-            'currency' => 'GBP',
+            'currency' => $region->currency(),
+            'symbol' => $region->symbol(),
             // Kept for the homepage hero (only when the exact name is taken).
             'suggestions' => $result['available'] ? [] : $this->suggestions($domain),
             // A richer set of available alternative TLDs for the full search page.
@@ -82,8 +88,8 @@ class CheckDomainAvailability
                 continue;
             }
 
-            if (! empty($check['available'])) {
-                $out[] = ['domain' => $candidate, 'available' => true, 'price' => $this->priceForDomain($candidate)];
+            if (! empty($check['available']) && ($price = $this->priceForDomain($candidate)) !== null) {
+                $out[] = ['domain' => $candidate, 'available' => true, 'price' => $price];
             }
         }
 
@@ -133,8 +139,8 @@ class CheckDomainAvailability
                 continue; // skip alternatives we cannot verify
             }
 
-            if (! empty($check['available'])) {
-                $suggestions[] = ['domain' => $candidate, 'available' => true, 'price' => $this->priceForDomain($candidate)];
+            if (! empty($check['available']) && ($price = $this->priceForDomain($candidate)) !== null) {
+                $suggestions[] = ['domain' => $candidate, 'available' => true, 'price' => $price];
             }
         }
 
@@ -155,18 +161,27 @@ class CheckDomainAvailability
     }
 
     /**
-     * Customer-facing GBP price for a specific domain, resolved from the admin
-     * TLD price book (longest-matching suffix). Falls back to the legacy flat
-     * catalogue price, then to a hard default, so search never breaks.
+     * Customer-facing price for a domain in the current storefront's currency,
+     * resolved from the admin TLD price book (longest-matching suffix), then the
+     * catalogue product price. Returns null when the storefront publishes no
+     * price for the extension — the caller drops it rather than inventing one by
+     * conversion.
      */
-    private function priceForDomain(string $domain): string
+    private function priceForDomain(string $domain): ?string
     {
-        $price = TldPricing::priceForDomain($domain);
+        $currency = Region::current()->currency();
+        $price = TldPricing::priceForDomain($domain, $currency);
 
         if ($price === null) {
-            $price = Product::ofType(ProductType::Domain)->active()->first()?->priceFor('yearly')?->amount ?? 12.99;
+            $price = Product::ofType(ProductType::Domain)->active()->first()?->priceFor('yearly', $currency)?->amount;
         }
 
-        return number_format((float) $price, 2, '.', '');
+        // Only the GBP storefront has a hardcoded last-resort figure; quoting it
+        // under another symbol would undercharge by the exchange rate.
+        if ($price === null && strtoupper($currency) === 'GBP') {
+            $price = 12.99;
+        }
+
+        return $price === null ? null : number_format((float) $price, 2, '.', '');
     }
 }

@@ -10,7 +10,7 @@
          (/domains?q=…), which auto-searches and shows the exact match plus
          alternatives and the domain + website bundle. --}}
     <div class="w-full">
-        <form method="GET" action="{{ route('domains.index') }}" class="flex flex-col gap-3 sm:flex-row" role="search" aria-label="Domain availability search">
+        <form method="GET" action="{{ region()->route('domains.index') }}" class="flex flex-col gap-3 sm:flex-row" role="search" aria-label="Domain availability search">
             <div class="flex-1">
                 <label for="domain-q-hero" class="sr-only">Domain name</label>
                 <input
@@ -39,6 +39,7 @@
 <div
     x-data="{
         query: @js(request('q', '')),
+        symbol: @js(region()->symbol()),
         loading: false,
         error: '',
         result: null,
@@ -50,7 +51,7 @@
             if (!domain) { this.error = 'Please enter a domain name to search.'; return; }
             this.loading = true;
             try {
-                const res = await fetch(@js(route('domains.search')), {
+                const res = await fetch(@js(region()->route('domains.search')), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -75,7 +76,7 @@
         async addToCart(domain) {
             this.adding = domain;
             try {
-                const res = await fetch(@js(route('cart.items.store')), {
+                const res = await fetch(@js(region()->route('cart.items.store')), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -84,7 +85,7 @@
                     },
                     body: JSON.stringify({ item_type: 'domain_registration', domain_name: domain }),
                 });
-                if (res.ok) { window.location = @js(route('cart.index')); }
+                if (res.ok) { window.location = @js(region()->route('cart.index')); }
                 else { this.error = 'We could not add that domain to your cart. Please try again.'; }
             } catch (e) {
                 this.error = 'We could not add that domain to your cart. Please try again.';
@@ -139,7 +140,7 @@
                         <p><span class="font-semibold" x-text="result.domain"></span> is <span class="font-semibold text-success">available</span></p>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="font-semibold" x-text="result.premium ? 'Premium · £' + result.price + '/yr' : '£' + result.price + '/yr'"></span>
+                        <span class="font-semibold" x-text="(result.premium ? 'Premium · ' : '') + (result.symbol || symbol) + result.price + '/yr'"></span>
                         <button type="button" class="btn-primary btn-sm" @click="addToCart(result.domain)" :disabled="adding === result.domain">
                             <span x-show="adding !== result.domain">Add to Cart</span>
                             <span x-show="adding === result.domain" x-cloak>Adding…</span>
@@ -161,7 +162,7 @@
                         <ul class="mt-2 divide-y divide-slate-200">
                             <template x-for="s in suggestions" :key="s.domain">
                                 <li class="flex items-center justify-between py-2">
-                                    <span x-text="s.domain + ' — £' + s.price + '/yr'"></span>
+                                    <span x-text="s.domain + ' — ' + symbol + s.price + '/yr'"></span>
                                     <button type="button" class="btn-secondary btn-sm" @click="addToCart(s.domain)" :disabled="adding === s.domain">
                                         <span x-show="adding !== s.domain">Add to Cart</span>
                                         <span x-show="adding === s.domain" x-cloak>Adding…</span>

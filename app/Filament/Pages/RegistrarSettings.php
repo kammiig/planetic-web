@@ -47,7 +47,7 @@ class RegistrarSettings extends Page implements HasForms
     public function mount(): void
     {
         $this->form->fill([
-            'default_registrar' => SiteSetting::get('registrar.default') ?: config('domain.default_registrar', 'porkbun'),
+            'default_registrar' => SiteSetting::get('registrar.default') ?: config('domain.default_registrar', 'cloudflare'),
         ]);
     }
 
@@ -56,12 +56,13 @@ class RegistrarSettings extends Page implements HasForms
         return $schema
             ->components([
                 Section::make('Default registrar')
-                    ->description('Used for new domain registrations. API keys are read from the server environment only and are never shown or stored here.')
+                    ->description($this->fallbackDescription())
                     ->schema([
                         Radio::make('default_registrar')
                             ->hiddenLabel()
                             ->options([
-                                'porkbun' => 'Porkbun (recommended)',
+                                'cloudflare' => 'Cloudflare (recommended)',
+                                'porkbun' => 'Porkbun',
                                 'namesilo' => 'NameSilo',
                                 'namecheap' => 'Namecheap',
                             ])
@@ -96,11 +97,29 @@ class RegistrarSettings extends Page implements HasForms
     private function registrarConfigured(string $name): bool
     {
         return match ($name) {
+            'cloudflare' => filled(config('domain.cloudflare.api_token')) && filled(config('domain.cloudflare.account_id')),
             'porkbun' => filled(config('domain.porkbun.api_key')) && filled(config('domain.porkbun.secret_key')),
             'namesilo' => filled(config('domain.namesilo.api_key')),
             'namecheap' => filled(config('domain.namecheap.api_key')) && filled(config('domain.namecheap.api_user')),
             default => false,
         };
+    }
+
+    /**
+     * Spells out the fallback routing on the page itself — an admin choosing
+     * Cloudflare needs to know that .co.uk registrations will not go there.
+     */
+    private function fallbackDescription(): string
+    {
+        $base = 'Used for new domain registrations. API keys are read from the server environment only and are never shown or stored here.';
+        $fallback = (string) config('domain.fallback_registrar', 'porkbun');
+
+        if (! in_array($fallback, IntegrationServiceProvider::REGISTRARS, true)) {
+            return $base.' No fallback registrar is configured, so a TLD the selected registrar cannot handle will fail the order.';
+        }
+
+        return $base.' Cloudflare\'s Registrar API is in beta and does not yet cover every TLD (notably .uk and .co.uk); '
+            .'those registrations route automatically to '.ucfirst($fallback).', which must stay configured.';
     }
 
     /** @return array<string, string> */

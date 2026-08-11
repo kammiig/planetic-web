@@ -6,7 +6,7 @@
     <x-legal title="Renewal Policy" updated="{{ now()->format('F Y') }}">
         <h2>First-year inclusive offer</h2>
         <p>
-            The £{{ number_format(config('billing.website_package.price'), 0) }} bespoke website package includes a free
+            The {{ money_compact($websitePackagePrice) }} bespoke website package includes a free
             domain and free hosting for the <strong>first year only</strong>. This is a first-year inclusive offer — it is
             <strong>not</strong> free forever. Renewal charges apply after the first year.
         </p>
@@ -35,7 +35,7 @@
         <h2>Cancellation</h2>
         <p>
             You can choose not to renew a service. Please contact us before the renewal date. See our
-            <a href="{{ route('legal.refund') }}">Refund Policy</a> for details on what is and isn't refundable.
+            <a href="{{ region()->route('legal.refund') }}">Refund Policy</a> for details on what is and isn't refundable.
         </p>
     </x-legal>
 @endsection

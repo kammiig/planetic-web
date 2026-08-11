@@ -4,11 +4,12 @@ namespace App\Services\Registrar;
 
 /**
  * Registrar abstraction so the platform is never locked into one provider.
- * Porkbun is the default/primary registrar; NameSilo and Namecheap remain
- * optional fallbacks — selected via the DEFAULT_REGISTRAR env var
- * (config/domain.php). Every method returns a normalised array (shaped by
- * RegistrarResponseParser); raw provider errors are converted to
- * RegistrarException and never surfaced to customers.
+ * Cloudflare is the default/primary registrar; Porkbun is the automatic
+ * fallback for TLDs outside Cloudflare's Registrar API beta, and NameSilo and
+ * Namecheap remain optional alternatives — all selected via the
+ * DEFAULT_REGISTRAR env var (config/domain.php). Every method returns a
+ * normalised array (shaped by RegistrarResponseParser); raw provider errors are
+ * converted to RegistrarException and never surfaced to customers.
  */
 interface RegistrarInterface
 {
@@ -27,8 +28,13 @@ interface RegistrarInterface
     public function getPricing(string $tld): array;
 
     /**
+     * `registrar` names the provider that actually performed the registration.
+     * It is normally this instance's own name(), but FallbackRegistrar may have
+     * routed the domain elsewhere — the domain record stores this value, so it
+     * must reflect who really holds the registration.
+     *
      * @param  array<string, mixed>  $data  domain, years, contact details, privacy flags
-     * @return array{domain: string, success: bool, registrar_domain_id: ?string, registrar_order_id: ?string, order_amount: ?string, expiry_date: ?string}
+     * @return array{domain: string, success: bool, registrar: string, registrar_domain_id: ?string, registrar_order_id: ?string, order_amount: ?string, expiry_date: ?string}
      */
     public function registerDomain(array $data): array;
 

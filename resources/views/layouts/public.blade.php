@@ -1,20 +1,49 @@
 @php
     use App\Models\SeoMeta;
+    use App\Support\Region;
 
     $defaultTitle = 'Premium Hosting, Domains & Bespoke Websites';
     $defaultDescription = 'Planetic Web builds your complete bespoke website, registers your domain, sets up hosting and DNS, and manages billing and renewals — all in one place.';
 
+    $currentRegion = $region ?? Region::current();
+    $routeName = request()->route()?->getName();
+
     // Admin-managed SEO for this route wins; otherwise fall back to the page's
     // own @section, then the site defaults. Decode entities first so a value
     // containing e.g. &amp; is not double-encoded when re-escaped below.
-    $seo = SeoMeta::forKey(request()->route()?->getName());
+    //
+    // Regional trees look up their OWN record ("int.home"). They deliberately do
+    // NOT inherit the default region's, because that copy quotes prices in the
+    // default currency — an international page would otherwise advertise "£200"
+    // in its own title. With no regional record the page falls through to its
+    // @section, which is written against the current storefront's prices; an
+    // admin can add an "int.*" record at any time to take control back.
+    $seo = SeoMeta::forKey($routeName);
+
+    // Robots directives are the exception: Google requires them to agree across
+    // hreflang alternates, so a page hidden in one storefront is hidden in all.
+    $sharedKey = $currentRegion->isDefault()
+        ? $routeName
+        : substr((string) $routeName, strlen($currentRegion->key) + 1);
+    $noindex = (bool) ($seo?->noindex ?? SeoMeta::forKey($sharedKey)?->noindex);
 
     $rawTitle = $seo?->meta_title ?: $__env->yieldContent('title', $defaultTitle);
     $rawDescription = $seo?->meta_description ?: $__env->yieldContent('meta_description', $defaultDescription);
 
     $metaTitle = html_entity_decode($rawTitle, ENT_QUOTES, 'UTF-8').' · '.config('app.name');
     $metaDescription = html_entity_decode($rawDescription, ENT_QUOTES, 'UTF-8');
+    // The canonical of a regional page is that page in its own tree — the two
+    // storefronts are alternates of each other, never duplicates of one master.
     $canonicalUrl = $seo?->canonical_url ?: url()->current();
+
+    $currentPath = '/'.ltrim(request()->path(), '/');
+
+    $regionAlternates = collect(Region::all())->map(fn (Region $r) => [
+        'hreflang' => $r->hreflang(),
+        'url' => url($r->translatePath($currentPath)),
+    ])->all();
+
+    $defaultRegionUrl = url(Region::default()->translatePath($currentPath));
 
     $ogTitle = $seo?->og_title ? html_entity_decode($seo->og_title, ENT_QUOTES, 'UTF-8') : $metaTitle;
     $ogDescription = $seo?->og_description ? html_entity_decode($seo->og_description, ENT_QUOTES, 'UTF-8') : $metaDescription;
@@ -47,7 +76,7 @@
     ];
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
+<html lang="{{ $currentRegion->hreflang() }}" class="h-full">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -56,9 +85,20 @@
     <title>{{ $metaTitle }}</title>
     <meta name="description" content="{{ $metaDescription }}">
     <link rel="canonical" href="{{ $canonicalUrl }}">
-    @if ($seo?->noindex)
+    @if ($noindex)
         <meta name="robots" content="noindex, follow">
     @endif
+
+    {{-- Regional alternates. Every storefront declares every other one (and
+         itself), which is what lets Google index BOTH the GBP and USD versions
+         and serve each to the right audience. Without this, IP-varied pricing
+         would leave one version permanently invisible — Googlebot crawls
+         predominantly from US addresses. --}}
+    @foreach ($regionAlternates as $alternate)
+        <link rel="alternate" hreflang="{{ $alternate['hreflang'] }}" href="{{ $alternate['url'] }}">
+    @endforeach
+    <link rel="alternate" hreflang="x-default" href="{{ $defaultRegionUrl }}">
+
     <meta name="theme-color" content="#0b1b33">
 
     {{-- Open Graph --}}
@@ -67,7 +107,12 @@
     <meta property="og:title" content="{{ $ogTitle }}">
     <meta property="og:description" content="{{ $ogDescription }}">
     <meta property="og:url" content="{{ $canonicalUrl }}">
-    <meta property="og:locale" content="en_GB">
+    <meta property="og:locale" content="{{ $currentRegion->locale() }}">
+    @foreach ($regionAlternates as $alternate)
+        @if ($alternate['hreflang'] !== $currentRegion->hreflang())
+            <meta property="og:locale:alternate" content="{{ str_replace('-', '_', $alternate['hreflang']) }}">
+        @endif
+    @endforeach
     @if ($ogImage)
         <meta property="og:image" content="{{ $ogImage }}">
     @endif
@@ -97,6 +142,7 @@
 <body class="flex min-h-full flex-col bg-white">
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
+    @include('partials.region-banner')
     @include('partials.public-header')
 
     <main id="main-content" class="flex-1">

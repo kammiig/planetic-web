@@ -1,15 +1,16 @@
 @extends('layouts.public')
 
-@section('title', 'Domain Name Registration UK — .co.uk from £8.99/yr')
-@section('meta_description', 'Register a UK domain name with free WHOIS privacy and automatic Cloudflare DNS. .co.uk from £8.99/yr, .com from £12.99/yr — or free with our £200 website package.')
+@section('title', 'Domain Name Registration '.region()->shortName().' — .'.region()->defaultTld().($cheapestTld ? ' from '.money($cheapestTld).'/yr' : ''))
+@section('meta_description', 'Register a domain name with free WHOIS privacy and automatic Cloudflare DNS.'.($cheapestTld ? ' Domains from '.money($cheapestTld).'/yr.' : '').($websitePackagePrice ? ' Free with our '.money_compact($websitePackagePrice).' website package.' : ''))
 
 @section('content')
     <div
         x-data="domainSearch(@js([
-            'searchUrl' => route('domains.search'),
-            'cartUrl' => route('cart.items.store'),
-            'cartIndexUrl' => route('cart.index'),
+            'searchUrl' => region()->route('domains.search'),
+            'cartUrl' => region()->route('cart.items.store'),
+            'cartIndexUrl' => region()->route('cart.index'),
             'websitePackagePrice' => $websitePackagePrice,
+            'symbol' => region()->symbol(),
             'initialQuery' => request('q', ''),
         ]))"
         x-init="if (query) search()"
@@ -97,7 +98,7 @@
                                 <div class="mt-auto flex items-end justify-between pt-4">
                                     <div>
                                         <template x-if="result.available">
-                                            <p><span class="text-2xl font-extrabold text-slate-900">£<span x-text="result.price"></span></span><span class="text-sm text-slate-500">/yr</span></p>
+                                            <p><span class="text-2xl font-extrabold text-slate-900"><span x-text="result.symbol || symbol"></span><span x-text="result.price"></span></span><span class="text-sm text-slate-500">/yr</span></p>
                                         </template>
                                         <template x-if="result.available"><p class="text-xs text-slate-500">For the first year</p></template>
                                         <template x-if="!result.available"><p class="text-sm text-slate-500">Not available</p></template>
@@ -115,7 +116,7 @@
                             <div class="flex flex-col rounded-[16px] border-2 border-primary-500 bg-white p-5 shadow-soft">
                                 <div class="flex items-center justify-between">
                                     <span class="inline-flex w-fit items-center gap-1 rounded-full bg-primary-500 px-2.5 py-1 text-xs font-bold text-white">Best value</span>
-                                    <a href="{{ route('website-package') }}" class="text-sm font-medium text-primary-600 hover:underline">Learn more</a>
+                                    <a href="{{ region()->route('website-package') }}" class="text-sm font-medium text-primary-600 hover:underline">Learn more</a>
                                 </div>
                                 <p class="mt-3 break-words text-lg font-extrabold text-slate-900"><span x-text="bundleDomain"></span> + Website &amp; hosting</p>
                                 <ul class="mt-3 space-y-1.5 text-sm text-slate-600">
@@ -125,7 +126,7 @@
                                 </ul>
                                 <div class="mt-auto flex items-end justify-between pt-4">
                                     <div>
-                                        <p><span class="text-2xl font-extrabold text-slate-900">£{{ number_format($websitePackagePrice, 0) }}</span></p>
+                                        <p><span class="text-2xl font-extrabold text-slate-900">{{ money_compact($websitePackagePrice) }}</span></p>
                                         <p class="text-xs text-slate-500">Free domain included</p>
                                     </div>
                                     <button type="button" class="btn-primary btn-sm" @click="add('website_package', bundleDomain, 'bundle')" x-bind:disabled="adding === 'bundle'">
@@ -157,7 +158,7 @@
                                             <span class="min-w-0 break-all font-medium text-slate-900" x-text="alt.domain"></span>
                                             <div class="flex items-center gap-4">
                                                 <span class="whitespace-nowrap text-right text-sm">
-                                                    <span class="font-bold text-slate-900">£<span x-text="alt.price"></span></span>
+                                                    <span class="font-bold text-slate-900"><span x-text="symbol"></span><span x-text="alt.price"></span></span>
                                                     <span class="block text-xs text-slate-400">For first year</span>
                                                 </span>
                                                 <button type="button" class="btn-secondary btn-sm" @click="add('domain_registration', alt.domain, alt.domain)" x-bind:disabled="adding === alt.domain">
@@ -181,7 +182,7 @@
                         @if ($chips->isNotEmpty())
                             <div class="mx-auto mt-5 flex max-w-2xl flex-wrap justify-center gap-2">
                                 @foreach ($chips as $tld)
-                                    <span class="badge badge-neutral text-sm">.{{ ltrim($tld->tld, '.') }} <span class="font-bold text-primary-600">£{{ number_format($tld->register_price, 2) }}/yr</span></span>
+                                    <span class="badge badge-neutral text-sm">.{{ ltrim($tld->tld, '.') }} <span class="font-bold text-primary-600">{{ money($tld->registerPrice()) }}/yr</span></span>
                                 @endforeach
                             </div>
                         @endif
@@ -221,7 +222,7 @@
 
                     <div class="mt-8 rounded-[14px] border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
                         About domain renewals: domains register for one year and renew annually. We remind you well before your renewal date — see the
-                        <a href="{{ route('legal.renewal') }}" class="font-semibold text-white underline">Renewal Policy</a>.
+                        <a href="{{ region()->route('legal.renewal') }}" class="font-semibold text-white underline">Renewal Policy</a>.
                     </div>
                 </div>
             </div>

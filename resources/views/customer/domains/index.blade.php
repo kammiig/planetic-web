@@ -52,7 +52,7 @@
                                 @if ($isWebsiteBundle)
                                     Included
                                 @elseif ($item)
-                                    £{{ number_format((float) $item->unit_price, 2) }}
+                                    {{ money($item->unit_price, $item->order?->currency) }}
                                 @else
                                     —
                                 @endif

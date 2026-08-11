@@ -112,6 +112,7 @@ class PorkbunRegistrar implements RegistrarInterface
         return [
             'domain' => $domain,
             'success' => true,
+            'registrar' => $this->name(),
             // Porkbun manages domains by name (no separate domain id); the
             // order id is the closest thing to a registration reference.
             'registrar_domain_id' => $domain,

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Region;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -17,7 +18,8 @@ class TldPricing extends Model
     public const CACHE_KEY = 'tld_pricings.active';
 
     protected $fillable = [
-        'tld', 'register_price', 'renew_price', 'transfer_price', 'cost_price',
+        'tld', 'register_price', 'register_price_usd', 'renew_price', 'renew_price_usd',
+        'transfer_price', 'transfer_price_usd', 'cost_price',
         'markup', 'free_eligible', 'is_featured', 'is_active', 'sort_order', 'cost_synced_at',
     ];
 
@@ -25,8 +27,11 @@ class TldPricing extends Model
     {
         return [
             'register_price' => 'decimal:2',
+            'register_price_usd' => 'decimal:2',
             'renew_price' => 'decimal:2',
+            'renew_price_usd' => 'decimal:2',
             'transfer_price' => 'decimal:2',
+            'transfer_price_usd' => 'decimal:2',
             'cost_price' => 'decimal:2',
             'markup' => 'decimal:2',
             'free_eligible' => 'boolean',
@@ -80,12 +85,56 @@ class TldPricing extends Model
         return null;
     }
 
-    /** Customer-facing registration price for a domain (null when no match). */
-    public static function priceForDomain(string $domain): ?float
+    /**
+     * Customer-facing registration price for a domain in a given currency
+     * (defaults to the current storefront's). Null when the TLD is unlisted, or
+     * when it carries no price in that currency — a TLD without a USD price is
+     * simply not sold in the international storefront rather than being
+     * converted at some exchange rate the admin never chose.
+     */
+    public static function priceForDomain(string $domain, ?string $currency = null): ?float
     {
-        $row = static::forDomain($domain);
+        return static::forDomain($domain)?->registerPrice($currency);
+    }
 
-        return $row ? (float) $row->register_price : null;
+    /** Registration price in a currency, or null when not published in it. */
+    public function registerPrice(?string $currency = null): ?float
+    {
+        return $this->priceIn('register_price', $currency);
+    }
+
+    public function renewPrice(?string $currency = null): ?float
+    {
+        return $this->priceIn('renew_price', $currency);
+    }
+
+    public function transferPrice(?string $currency = null): ?float
+    {
+        return $this->priceIn('transfer_price', $currency);
+    }
+
+    /** Whether this TLD is sold in the given currency at all. */
+    public function availableIn(?string $currency = null): bool
+    {
+        return $this->registerPrice($currency) !== null;
+    }
+
+    /**
+     * GBP lives in the base column; every other supported currency has its own
+     * suffixed column (register_price_usd). An unsupported currency, or an
+     * empty column, yields null.
+     */
+    private function priceIn(string $column, ?string $currency = null): ?float
+    {
+        $currency = strtoupper($currency ?: Region::current()->currency());
+
+        if ($currency !== 'GBP') {
+            $column .= '_'.strtolower($currency);
+        }
+
+        $value = $this->getAttribute($column);
+
+        return $value === null || $value === '' ? null : (float) $value;
     }
 
     public function tldLabel(): string

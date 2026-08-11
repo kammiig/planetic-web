@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\WebsitePackages\Schemas;
 
+use App\Filament\Support\PriceFields;
 use App\Enums\ProductType;
 use App\Models\Product;
 use Filament\Forms\Components\Repeater;
@@ -51,11 +52,12 @@ class WebsitePackageForm
                         TextInput::make('sort_order')->numeric()->default(0),
                     ]),
 
-                Section::make('Pricing (GBP)')
-                    ->description('Stored on the linked product (one-time) and used at checkout.')
-                    ->schema([
-                        TextInput::make('price_one_time')->label('One-time price')->numeric()->prefix('£')->minValue(0)->dehydrated(false),
-                    ]),
+                Section::make('Pricing')
+                    ->description('Stored on the linked product (one-time) and used at checkout. Each storefront sells from '
+                        .'its own figure — set a deliberate price per currency rather than a converted one. '
+                        .'Leave a currency blank to withdraw the package from that storefront.')
+                    ->columns(2)
+                    ->schema(PriceFields::make(['one_time' => 'One-time price'])),
 
                 Section::make('Inclusions')
                     ->columns(2)

@@ -74,6 +74,7 @@ class NamecheapRegistrar implements RegistrarInterface
         return [
             'domain' => strtolower($data['domain']),
             'success' => $result !== null && ((string) $result['Registered']) === 'true',
+            'registrar' => $this->name(),
             'registrar_domain_id' => $result ? (string) $result['DomainID'] : null,
             'registrar_order_id' => $result ? (string) $result['OrderID'] : null,
             'order_amount' => $result ? (string) $result['ChargedAmount'] : null,

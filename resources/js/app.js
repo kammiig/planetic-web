@@ -558,6 +558,9 @@ Alpine.data('domainSearch', (config = {}) => ({
     cartUrl: config.cartUrl,
     cartIndexUrl: config.cartIndexUrl,
     websitePackagePrice: config.websitePackagePrice || 200,
+    // Currency symbol of the storefront this page belongs to, so JS-rendered
+    // prices match the server-rendered ones instead of assuming GBP.
+    symbol: config.symbol || '£',
     loading: false,
     error: '',
     result: null,
@@ -630,6 +633,84 @@ Alpine.data('domainSearch', (config = {}) => ({
         } finally {
             this.adding = null;
         }
+    },
+}));
+
+/**
+ * Regional storefront suggestion.
+ *
+ * The page HTML is identical for every visitor — that is what keeps it
+ * cacheable at Cloudflare (which will not vary its cache on CF-IPCountry
+ * outside Enterprise plans) and keeps both storefronts indexable by Googlebot,
+ * which crawls predominantly from US IP addresses. The visitor's country is
+ * therefore fetched separately from /region-hint, which is explicitly
+ * no-store.
+ *
+ * The banner only ever offers a switch. It never redirects, and once the
+ * visitor has expressed a preference — by switching or by dismissing — the
+ * cookie stops it asking again.
+ */
+Alpine.data('regionSuggestion', (config = {}) => ({
+    current: config.current,
+    hintUrl: config.hintUrl,
+    cookie: config.cookie || 'pw_region',
+    cookieDays: config.cookieDays || 365,
+    regions: config.regions || [],
+    suggestion: null,
+    show: false,
+
+    get currentLabel() {
+        const match = this.regions.find((r) => r.key === this.current);
+        return match ? match.currency : '';
+    },
+
+    async init() {
+        // An existing choice (from the selector or a previous dismissal) is
+        // final — never nag a visitor who has already decided.
+        if (this.readCookie()) return;
+
+        try {
+            const res = await fetch(this.hintUrl, {
+                headers: { Accept: 'application/json' },
+                cache: 'no-store',
+            });
+            if (!res.ok) return;
+
+            const hint = await res.json();
+            if (!hint.prompt || !hint.suggested || hint.suggested === this.current) return;
+
+            const target = this.regions.find((r) => r.key === hint.suggested);
+            if (!target) return;
+
+            this.suggestion = target;
+            this.show = true;
+        } catch (e) {
+            // Detection is a convenience, never a requirement: on any failure
+            // the visitor simply stays on the storefront they asked for.
+        }
+    },
+
+    /** Record the choice so neither this visit nor the next one re-prompts. */
+    remember(key) {
+        this.writeCookie(key);
+    },
+
+    dismiss() {
+        this.writeCookie(this.current);
+        this.show = false;
+    },
+
+    readCookie() {
+        return document.cookie
+            .split('; ')
+            .find((row) => row.startsWith(this.cookie + '='))
+            ?.split('=')[1] || null;
+    },
+
+    writeCookie(value) {
+        const expires = new Date(Date.now() + this.cookieDays * 864e5).toUTCString();
+        const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+        document.cookie = `${this.cookie}=${value}; path=/; expires=${expires}; SameSite=Lax${secure}`;
     },
 }));
 

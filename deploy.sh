@@ -5,17 +5,28 @@
 # Adjust APP_DIR to wherever the git clone lives on the server.
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-$HOME/planetic-web}"
+APP_DIR="${APP_DIR:-$HOME/planeticweb-app}"
 PHP="/usr/local/bin/php"
-COMPOSER="/opt/cpanel/composer/bin/composer"
+
+# Find composer wherever this host keeps it.
+COMPOSER="${COMPOSER:-}"
+if [ -z "$COMPOSER" ]; then
+    for candidate in /opt/cpanel/composer/bin/composer /usr/local/bin/composer /usr/bin/composer "$HOME/composer.phar"; do
+        [ -f "$candidate" ] && COMPOSER="$candidate" && break
+    done
+fi
 
 cd "$APP_DIR"
 
 echo "→ Pulling latest code"
 git pull origin main
 
-echo "→ Installing PHP dependencies"
-"$PHP" "$COMPOSER" install --no-dev --optimize-autoloader --no-interaction
+if [ -n "$COMPOSER" ]; then
+    echo "→ Installing PHP dependencies ($COMPOSER)"
+    "$PHP" "$COMPOSER" install --no-dev --optimize-autoloader --no-interaction
+else
+    echo "→ Composer not found — skipping dependency install (fine unless composer.json changed)"
+fi
 
 echo "→ Migrating database"
 "$PHP" artisan migrate --force

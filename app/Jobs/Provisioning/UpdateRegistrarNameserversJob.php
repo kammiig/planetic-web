@@ -6,11 +6,13 @@ use App\Enums\ProvisioningJobType;
 use App\Exceptions\ProvisioningException;
 use App\Models\Order;
 use App\Models\ProvisioningJob;
-use App\Services\Registrar\RegistrarInterface;
+use App\Services\Registrar\RegistrarResolver;
 
 /**
  * Points the domain's registrar nameservers at Cloudflare (Ticket 29). Does
- * not run until Cloudflare has issued nameservers.
+ * not run until Cloudflare has issued nameservers. For domains registered
+ * through Cloudflare Registrar this is a verified no-op — those domains are
+ * locked to Cloudflare nameservers already.
  */
 class UpdateRegistrarNameserversJob extends ProvisioningStepJob
 {
@@ -40,7 +42,12 @@ class UpdateRegistrarNameserversJob extends ProvisioningStepJob
             return ['simulated' => true, 'nameservers' => $nameservers];
         }
 
-        $registrar = app(RegistrarInterface::class);
+        // Target the registrar that actually holds the domain, not the current
+        // default: a .co.uk outside Cloudflare's API beta is registered at
+        // Porkbun, and its nameservers must be set there. Cloudflare-registered
+        // domains are already on Cloudflare nameservers, so their registrar
+        // reports this as a verified no-op.
+        $registrar = app(RegistrarResolver::class)->forDomain($domain);
         $result = $registrar->updateNameservers($domain->domain_name, $nameservers);
 
         $domain->update([

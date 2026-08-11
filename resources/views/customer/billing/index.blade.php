@@ -55,7 +55,7 @@
                                     <span class="block text-xs text-slate-500">{{ $r['sub_label'] }}</span>
                                 </td>
                                 <td>{{ $r['renewal_date']?->format('j M Y') ?? '—' }}</td>
-                                <td>£{{ number_format($r['amount'], 2) }}<span class="text-slate-500">{{ $r['cycle'] }}</span></td>
+                                <td>{{ money($r['amount'], $r['currency'] ?? null, true) }}<span class="text-slate-500">{{ $r['cycle'] }}</span></td>
                                 <td>
                                     <form method="POST" action="{{ $r['toggle_url'] }}" class="flex items-center gap-2">
                                         @csrf
@@ -100,7 +100,7 @@
                             <tr>
                                 <td class="font-semibold">{{ $invoice->invoice_number }}</td>
                                 <td>{{ $invoice->created_at->format('j M Y') }}</td>
-                                <td>£{{ number_format((float) $invoice->total, 2) }}</td>
+                                <td>{{ money($invoice->total, $invoice->currency, true) }}</td>
                                 <td><x-status-badge :status="$invoice->status" /></td>
                                 <td class="text-right"><a href="{{ route('customer.invoices.show', $invoice) }}" class="btn-secondary btn-sm">View</a></td>
                             </tr>
@@ -131,7 +131,7 @@
                         @foreach ($subscriptions as $subscription)
                             <tr>
                                 <td class="font-medium">{{ $subscription->product?->name ?? 'Service' }} <span class="text-slate-500">({{ $subscription->billing_cycle }})</span></td>
-                                <td>£{{ number_format((float) $subscription->amount, 2) }}</td>
+                                <td>{{ money($subscription->amount, $subscription->currency, true) }}</td>
                                 <td>{{ $subscription->next_renewal_date?->format('j M Y') ?? '—' }}</td>
                                 <td><x-status-badge :status="$subscription->status" /></td>
                             </tr>

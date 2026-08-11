@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ProductType;
+use App\Support\Region;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -53,9 +54,31 @@ class Product extends Model
     }
 
     /** Cheapest active price for display ("from £x"). */
-    public function priceFor(string $billingCycle = 'one_time'): ?ProductPrice
+    /**
+     * The active price for a billing cycle in a currency (defaults to the
+     * current storefront's).
+     *
+     * Prices are never converted between currencies: each storefront sells from
+     * its own product_prices row, so a product with no row in the requested
+     * currency returns null and is simply not purchasable there. Falling back to
+     * another currency's row would quote a GBP figure under a "$" symbol.
+     */
+    public function priceFor(string $billingCycle = 'one_time', ?string $currency = null): ?ProductPrice
     {
-        return $this->activePrices->firstWhere('billing_cycle', $billingCycle)
-            ?? $this->activePrices->sortBy('amount')->first();
+        $currency = strtoupper($currency ?: Region::current()->currency());
+
+        $inCurrency = $this->activePrices
+            ->filter(fn (ProductPrice $price) => strtoupper((string) $price->currency) === $currency);
+
+        return $inCurrency->firstWhere('billing_cycle', $billingCycle)
+            ?? $inCurrency->sortBy('amount')->first();
+    }
+
+    /** Whether this product is sold in the given currency at all. */
+    public function availableIn(?string $currency = null): bool
+    {
+        return $this->priceFor('one_time', $currency) !== null
+            || $this->priceFor('monthly', $currency) !== null
+            || $this->priceFor('yearly', $currency) !== null;
     }
 }

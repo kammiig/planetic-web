@@ -295,7 +295,7 @@
                                                         <p class="mt-1 text-sm font-medium text-success">Includes a free domain &amp; hosting for the first year.</p>
                                                     @endif
                                                 </div>
-                                                <p class="whitespace-nowrap font-semibold text-slate-900">£{{ number_format((float) $item->total, 2) }}</p>
+                                                <p class="whitespace-nowrap font-semibold text-slate-900">{{ money($item->total, $currency ?? null) }}</p>
                                             </li>
                                         @endforeach
                                     </ul>

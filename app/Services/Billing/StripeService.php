@@ -54,9 +54,11 @@ class StripeService
     {
         $customerId = $this->ensureCustomer($order->user);
 
+        $currency = $this->currencyFor($order);
+
         $lineItems = $order->items->map(fn ($item) => [
             'price_data' => [
-                'currency' => config('stripe.currency', 'gbp'),
+                'currency' => $currency,
                 'product_data' => ['name' => $item->name],
                 'unit_amount' => (int) round(((float) $item->unit_price) * 100),
             ],
@@ -99,7 +101,7 @@ class StripeService
         $client = $this->client();
         $customerId = $this->ensureCustomer($order->user);
         $amount = $this->minorAmount((float) $order->total);
-        $currency = config('stripe.currency', 'gbp');
+        $currency = $this->currencyFor($order);
 
         // Reuse an existing intent for this order while it can still be paid.
         if (filled($order->stripe_payment_intent_id)) {
@@ -109,6 +111,19 @@ class StripeService
                 $payable = in_array($intent->status, [
                     'requires_payment_method', 'requires_confirmation', 'requires_action', 'processing',
                 ], true);
+
+                // A currency mismatch means the order was rebuilt in another
+                // storefront. Stripe cannot re-denominate a live intent, so let
+                // it lapse and create a fresh one rather than charging the right
+                // number in the wrong currency.
+                if ($payable && strtolower((string) $intent->currency) !== $currency) {
+                    Log::channel('stack')->warning('Stripe PaymentIntent currency no longer matches the order; creating a fresh intent.', [
+                        'order' => $order->order_number,
+                        'intent_currency' => $intent->currency,
+                        'order_currency' => $currency,
+                    ]);
+                    $payable = false;
+                }
 
                 if ($payable) {
                     // Keep the amount in sync if the basket changed while still editable.
@@ -136,6 +151,9 @@ class StripeService
                 'order_id' => (string) $order->id,
                 'order_number' => $order->order_number,
             ],
+            // Stripe presents the payment methods available for the presentment
+            // currency and the customer's location, so the international
+            // storefront automatically offers the right ones for USD.
             'automatic_payment_methods' => ['enabled' => true],
             // Save the card to the customer so it can be shown in Billing and
             // reused for renewals (off-session), never re-prompting for details.
@@ -153,6 +171,23 @@ class StripeService
     public function minorAmount(float $amount): int
     {
         return (int) round($amount * 100);
+    }
+
+    /**
+     * The Stripe presentment currency for an order: the currency STORED on the
+     * order, which was locked when its cart was created.
+     *
+     * It is deliberately not read from the current request — a customer who
+     * browsed to the other storefront between building a basket and paying must
+     * still be charged in the currency they were quoted. config('stripe.currency')
+     * remains the last-resort default for legacy orders saved before regional
+     * pricing existed.
+     */
+    public function currencyFor(Order $order): string
+    {
+        $currency = strtolower(trim((string) $order->currency));
+
+        return $currency !== '' ? $currency : strtolower((string) config('stripe.currency', 'gbp'));
     }
 
     /**

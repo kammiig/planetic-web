@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use App\Support\Copy;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
 /**
  * Per-page SEO metadata keyed by route name. The public layout reads the row
  * for the current route (cached) and falls back to defaults when absent.
+ *
+ * Regional storefronts use their own prefixed keys ("int.home"). Titles and
+ * descriptions support the storefront tokens in App\Support\Copy (":price",
+ * ":currency", ":symbol") so one record cannot advertise the wrong currency.
  */
 class SeoMeta extends Model
 {
@@ -22,6 +28,36 @@ class SeoMeta extends Model
     protected function casts(): array
     {
         return ['noindex' => 'boolean'];
+    }
+
+    protected function metaTitle(): Attribute
+    {
+        return Attribute::get(fn (?string $value) => Copy::localise($value));
+    }
+
+    protected function metaDescription(): Attribute
+    {
+        return Attribute::get(fn (?string $value) => Copy::localise($value));
+    }
+
+    protected function ogTitle(): Attribute
+    {
+        return Attribute::get(fn (?string $value) => Copy::localise($value));
+    }
+
+    protected function ogDescription(): Attribute
+    {
+        return Attribute::get(fn (?string $value) => Copy::localise($value));
+    }
+
+    protected function twitterTitle(): Attribute
+    {
+        return Attribute::get(fn (?string $value) => Copy::localise($value));
+    }
+
+    protected function twitterDescription(): Attribute
+    {
+        return Attribute::get(fn (?string $value) => Copy::localise($value));
     }
 
     protected static function booted(): void

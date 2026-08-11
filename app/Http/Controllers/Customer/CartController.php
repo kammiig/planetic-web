@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Customer;
 
+use App\Support\Region;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AddCartItemRequest;
 use App\Models\CartItem;
@@ -43,7 +44,9 @@ class CartController extends Controller
             ]);
         }
 
-        return redirect()->route('cart.index')->with('success', $item->name.' added to your cart.');
+        // Stay in the storefront the item was added from.
+        return redirect()->to(Region::current()->route('cart.index'))
+            ->with('success', $item->name.' added to your cart.');
     }
 
     public function destroy(Request $request, CartItem $cartItem): JsonResponse|RedirectResponse
@@ -57,7 +60,7 @@ class CartController extends Controller
         }
 
         return $removed
-            ? redirect()->route('cart.index')->with('success', 'Item removed from your cart.')
-            : redirect()->route('cart.index')->with('error', 'That item could not be removed. Please refresh the page and try again.');
+            ? redirect()->to(Region::current()->route('cart.index'))->with('success', 'Item removed from your cart.')
+            : redirect()->to(Region::current()->route('cart.index'))->with('error', 'That item could not be removed. Please refresh the page and try again.');
     }
 }

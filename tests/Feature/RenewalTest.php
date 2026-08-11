@@ -68,7 +68,7 @@ class RenewalTest extends TestCase
         $account = $this->hostingAccount(['renewal_date' => today()->addDays(7)->toDateString()]);
         $key = 'hosting:'.$account->id.':7:'.$account->renewal_date->toDateString();
 
-        $args = [$account->user_id, 'Hosting for example.com', $account->renewal_date->toDateString(), null, 7, $key];
+        $args = [$account->user_id, 'Hosting for example.com', $account->renewal_date->toDateString(), null, null, 7, $key];
 
         (new SendRenewalReminderJob(...$args))->handle(app(\App\Services\Notifications\NotificationService::class));
         (new SendRenewalReminderJob(...$args))->handle(app(\App\Services\Notifications\NotificationService::class));

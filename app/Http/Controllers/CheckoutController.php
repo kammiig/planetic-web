@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Region;
 use App\Actions\Checkout\CompletePaidOrder;
 use App\Actions\Checkout\ConfirmOrderPayment;
 use App\Actions\Orders\CreateOrderFromCart;
@@ -31,7 +32,7 @@ class CheckoutController extends Controller
         $pendingOrder = $this->pendingCheckoutOrder($request);
 
         if ($cart->items->isEmpty() && ! $pendingOrder) {
-            return redirect()->route('cart.index')->with('info', 'Your cart is empty.');
+            return redirect()->to(Region::current()->route('cart.index'))->with('info', 'Your cart is empty.');
         }
 
         // Prefer the live cart; fall back to an in-progress order (e.g. after a

@@ -29,7 +29,7 @@
             </div>
 
             <div class="card">
-                <form method="POST" action="{{ route('contact.store') }}" class="space-y-4" novalidate>
+                <form method="POST" action="{{ region()->route('contact.store') }}" class="space-y-4" novalidate>
                     @csrf
                     <x-field name="name" label="Your name" autocomplete="name" :required="true" />
                     <x-field name="email" label="Email address" type="email" autocomplete="email" :required="true" />

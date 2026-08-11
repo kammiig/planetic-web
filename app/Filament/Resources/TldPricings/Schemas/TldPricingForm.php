@@ -27,8 +27,8 @@ class TldPricingForm
                         TextInput::make('sort_order')->numeric()->default(0)->helperText('Lower numbers appear first.'),
                     ]),
 
-                Section::make('Customer pricing (GBP)')
-                    ->description('What customers pay. Domain search and checkout use the registration price.')
+                Section::make('Customer pricing — United Kingdom (GBP)')
+                    ->description('What UK customers pay. Domain search and checkout use the registration price.')
                     ->columns(3)
                     ->schema([
                         TextInput::make('register_price')->label('Register / year')->numeric()->prefix('£')->required()->minValue(0),
@@ -36,8 +36,19 @@ class TldPricingForm
                         TextInput::make('transfer_price')->label('Transfer')->numeric()->prefix('£')->minValue(0),
                     ]),
 
+                Section::make('Customer pricing — International (USD)')
+                    ->description('Set a deliberate dollar price rather than a converted one. '
+                        .'LEAVE BLANK to withhold this extension from the international storefront entirely — '
+                        .'which is the right choice for UK-only names like .co.uk.')
+                    ->columns(3)
+                    ->schema([
+                        TextInput::make('register_price_usd')->label('Register / year')->numeric()->prefix('$')->minValue(0),
+                        TextInput::make('renew_price_usd')->label('Renewal / year')->numeric()->prefix('$')->minValue(0),
+                        TextInput::make('transfer_price_usd')->label('Transfer')->numeric()->prefix('$')->minValue(0),
+                    ]),
+
                 Section::make('Internal reference (admin only)')
-                    ->description('Never shown to customers. Cost can be synced from Porkbun.')
+                    ->description('Never shown to customers. Cost can be synced from the registrar.')
                     ->columns(2)
                     ->schema([
                         TextInput::make('cost_price')->label('Cost / year')->numeric()->prefix('£')->minValue(0),

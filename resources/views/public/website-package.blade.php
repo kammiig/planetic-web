@@ -1,7 +1,7 @@
 @extends('layouts.public')
 
-@section('title', 'Small Business Website Design UK — Complete Website for £200')
-@section('meta_description', 'How much does a website cost? Ours is £200 all-in: bespoke small business website design with a free domain and hosting for the first year, SSL and email set up for you. Ready in about two weeks.')
+@section('title', 'Small Business Website Design '.region()->shortName().' — Complete Website for '.money_compact($price))
+@section('meta_description', 'How much does a website cost? Ours is '.money_compact($price).' all-in: bespoke small business website design with a free domain and hosting for the first year, SSL and email set up for you. Ready in about two weeks.')
 
 @php
     $productSchema = [
@@ -16,7 +16,7 @@
             'price' => number_format((float) ($price ?? 200), 2, '.', ''),
             'priceCurrency' => 'GBP',
             'availability' => 'https://schema.org/InStock',
-            'url' => route('website-package'),
+            'url' => region()->route('website-package'),
         ],
     ];
 @endphp
@@ -31,19 +31,19 @@
         <div class="container-px py-16 text-center lg:py-20">
             <span class="badge badge-primary">Complete package</span>
             <h1 class="mx-auto mt-4 max-w-3xl text-4xl font-extrabold sm:text-5xl">
-                Complete Bespoke Website for £{{ number_format($price, 0) }}
+                Complete Bespoke Website for {{ money_compact($price) }}
             </h1>
             <p class="mx-auto mt-4 max-w-2xl text-lg font-medium text-accent-cyan">
                 {{ $freeYearNotice }}
             </p>
             <div class="mt-8 flex flex-wrap justify-center gap-3">
-                <form method="POST" action="{{ route('cart.items.store') }}">
+                <form method="POST" action="{{ region()->route('cart.items.store') }}">
                     @csrf
                     <input type="hidden" name="item_type" value="website_package">
                     @if ($product)<input type="hidden" name="product_id" value="{{ $product->id }}">@endif
                     <button type="submit" class="btn-primary">Start Now</button>
                 </form>
-                <a href="{{ route('domains.index') }}" class="btn-ghost-dark">Search a domain first</a>
+                <a href="{{ region()->route('domains.index') }}" class="btn-ghost-dark">Search a domain first</a>
             </div>
         </div>
     </section>
@@ -161,20 +161,20 @@
         <div class="alert alert-info mx-auto max-w-3xl">
             <h2 class="text-lg font-bold">About renewals</h2>
             <p class="mt-2">
-                The £{{ number_format($price, 0) }} website package includes your domain and hosting free for the
+                The {{ money_compact($price) }} website package includes your domain and hosting free for the
                 <strong>first year only</strong>. After the first year, standard domain and hosting renewal charges apply.
-                See our <a href="{{ route('legal.renewal') }}" class="font-semibold underline">Renewal Policy</a> for full details.
+                See our <a href="{{ region()->route('legal.renewal') }}" class="font-semibold underline">Renewal Policy</a> for full details.
             </p>
         </div>
     </section>
 
     {{-- CTA --}}
     <section class="container-px pb-20 text-center">
-        <form method="POST" action="{{ route('cart.items.store') }}" class="inline">
+        <form method="POST" action="{{ region()->route('cart.items.store') }}" class="inline">
             @csrf
             <input type="hidden" name="item_type" value="website_package">
             @if ($product)<input type="hidden" name="product_id" value="{{ $product->id }}">@endif
-            <button type="submit" class="btn-primary">Get your website for £{{ number_format($price, 0) }}</button>
+            <button type="submit" class="btn-primary">Get your website for {{ money_compact($price) }}</button>
         </form>
     </section>
 @endsection

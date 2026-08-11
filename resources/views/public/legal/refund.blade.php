@@ -18,7 +18,7 @@
             not been substantially used. Renewal charges are non-refundable once the new term has begun.
         </p>
 
-        <h2>The £{{ number_format(config('billing.website_package.price'), 0) }} website package</h2>
+        <h2>The {{ money_compact($websitePackagePrice) }} website package</h2>
         <p>
             Because the package includes design work that begins once you submit your project details, refunds are limited
             once work has started. If you request a refund before any design work begins, we will refund the package fee

@@ -51,7 +51,7 @@ class EmailNotificationTest extends TestCase
         $this->assertStringContainsString('Thanks for your order', (new OrderConfirmationMail($order))->render());
         $this->assertStringContainsString('ready', (new ProvisioningCompletedMail($order, null, $account))->render());
         $this->assertStringContainsString('payment', strtolower((new PaymentFailedMail($order))->render()));
-        $this->assertStringContainsString('renew', strtolower((new RenewalReminderMail('Jane', 'Starter Hosting', '1 Jun 2027', 49.00, 7))->render()));
+        $this->assertStringContainsString('renew', strtolower((new RenewalReminderMail('Jane', 'Starter Hosting', '1 Jun 2027', 49.00, 'GBP', 7))->render()));
         $this->assertStringContainsString('suspended', strtolower((new HostingSuspendedMail($account))->render()));
         $this->assertStringContainsString('active again', strtolower((new HostingReactivatedMail($account))->render()));
     }

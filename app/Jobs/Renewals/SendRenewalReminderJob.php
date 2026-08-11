@@ -26,6 +26,7 @@ class SendRenewalReminderJob implements ShouldQueue
         public string $serviceName,
         public string $renewalDate,
         public ?float $amount,
+        public ?string $currency,
         public int $daysBefore,
         public string $dedupKey,
     ) {}
@@ -46,6 +47,7 @@ class SendRenewalReminderJob implements ShouldQueue
             $this->serviceName,
             Carbon::parse($this->renewalDate)->format('j M Y'),
             $this->amount,
+            $this->currency,
             $this->daysBefore,
         ), 'renewal_reminder');
 

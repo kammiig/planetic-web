@@ -32,7 +32,7 @@
         @endif
 
         <p class="mt-8 text-center text-sm text-slate-500">
-            Need a website too? The <a href="{{ route('website-package') }}" class="font-semibold text-primary-600 hover:underline">£200 website package</a> includes free hosting for the first year.
+            Need a website too? The <a href="{{ region()->route('website-package') }}" class="font-semibold text-primary-600 hover:underline">{{ money_compact($websitePackagePrice) }} website package</a> includes free hosting for the first year.
         </p>
     </section>
 

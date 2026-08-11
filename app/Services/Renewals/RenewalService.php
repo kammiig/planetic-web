@@ -29,7 +29,7 @@ class RenewalService
             ->whereDate('expiry_date', $target)
             ->each(fn (Domain $d) => $items->push([
                 'type' => 'domain', 'id' => $d->id, 'user' => $d->user,
-                'name' => $d->domain_name.' (domain)', 'date' => $d->expiry_date, 'amount' => null,
+                'name' => $d->domain_name.' (domain)', 'date' => $d->expiry_date, 'amount' => null, 'currency' => null,
             ]));
 
         HostingAccount::with('user', 'hostingPackage')
@@ -38,7 +38,7 @@ class RenewalService
             ->each(fn (HostingAccount $h) => $items->push([
                 'type' => 'hosting', 'id' => $h->id, 'user' => $h->user,
                 'name' => ($h->hostingPackage?->name ?? 'Hosting').' for '.$h->domain_name,
-                'date' => $h->renewal_date, 'amount' => null,
+                'date' => $h->renewal_date, 'amount' => null, 'currency' => null,
             ]));
 
         Subscription::with('user', 'product')
@@ -46,7 +46,8 @@ class RenewalService
             ->whereDate('next_renewal_date', $target)
             ->each(fn (Subscription $s) => $items->push([
                 'type' => 'subscription', 'id' => $s->id, 'user' => $s->user,
-                'name' => $s->product?->name ?? 'Subscription', 'date' => $s->next_renewal_date, 'amount' => (float) $s->amount,
+                'name' => $s->product?->name ?? 'Subscription', 'date' => $s->next_renewal_date,
+                'amount' => (float) $s->amount, 'currency' => $s->currency,
             ]));
 
         return $items->filter(fn ($i) => $i['user'] !== null)->values();

@@ -8,21 +8,73 @@ return [
     |--------------------------------------------------------------------------
     |
     | Selects which registrar implementation the RegistrarInterface binding
-    | resolves to. Porkbun is the primary/default registrar (cheapest);
-    | NameSilo and Namecheap remain optional fallbacks, used only when
-    | DEFAULT_REGISTRAR names them. Swappable purely through configuration —
-    | no code changes required.
+    | resolves to. Cloudflare is the primary/default registrar (at-cost pricing,
+    | and its domains are locked to Cloudflare nameservers — which is where this
+    | platform points every domain anyway). Porkbun, NameSilo and Namecheap
+    | remain available. Swappable purely through configuration — no code
+    | changes required.
     |
     | DEFAULT_REGISTRAR is the canonical variable; DOMAIN_REGISTRAR is honoured
     | as a legacy alias so existing deployments keep working.
     |
     */
 
-    'default_registrar' => env('DEFAULT_REGISTRAR', env('DOMAIN_REGISTRAR', 'porkbun')),
+    'default_registrar' => env('DEFAULT_REGISTRAR', env('DOMAIN_REGISTRAR', 'cloudflare')),
 
     /*
     |--------------------------------------------------------------------------
-    | Porkbun (Primary / Default)
+    | Fallback Registrar
+    |--------------------------------------------------------------------------
+    |
+    | The Cloudflare Registrar API is in beta and covers only a subset of the
+    | extensions Cloudflare supports in its dashboard — .uk is Cloudflare's own
+    | documented example of one it cannot yet register through the API. Because
+    | .co.uk is this platform's primary TLD, such domains are routed to this
+    | fallback registrar automatically rather than failing a paid order.
+    |
+    | ONLY provider-capability failures fall back. A taken domain, a rejected
+    | contact, a declined payment or a bad token all fail fast on the primary,
+    | so the fallback can never mask a real error or double-buy a domain.
+    |
+    | Set FALLBACK_REGISTRAR=none to disable fallback routing entirely.
+    |
+    */
+
+    'fallback_registrar' => env('FALLBACK_REGISTRAR', 'porkbun'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cloudflare Registrar (Primary / Default)
+    |--------------------------------------------------------------------------
+    |
+    | Registrar API beta. Uses a scoped bearer token — separate from the DNS
+    | token, because registration is a spending permission — read only from the
+    | server environment and never exposed to the frontend, logs, emails or
+    | admin screens. Falls back to the DNS token/base when unset so a single
+    | correctly-scoped token also works.
+    |
+    | Registrations are charged to the Cloudflare account's default payment
+    | method and are NON-REFUNDABLE, so registerDomain() is idempotent: it
+    | adopts an existing registration rather than buying the domain twice.
+    |
+    */
+
+    'cloudflare' => [
+        'enabled' => filter_var(env('CLOUDFLARE_REGISTRAR_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'api_token' => env('CLOUDFLARE_REGISTRAR_API_TOKEN', env('CLOUDFLARE_API_TOKEN')),
+        'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
+        'endpoint' => env('CLOUDFLARE_API_BASE', 'https://api.cloudflare.com/client/v4'),
+
+        // Registration can complete asynchronously (HTTP 202). How many times to
+        // poll registration-status, and how long to wait between polls, before
+        // handing the step back for retry.
+        'registration_poll_attempts' => (int) env('CLOUDFLARE_REGISTRATION_POLL_ATTEMPTS', 5),
+        'registration_poll_seconds' => (int) env('CLOUDFLARE_REGISTRATION_POLL_SECONDS', 3),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Porkbun (Fallback)
     |--------------------------------------------------------------------------
     |
     | API v3. Credentials are read only from the server environment and are

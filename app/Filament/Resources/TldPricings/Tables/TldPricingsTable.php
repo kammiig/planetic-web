@@ -23,7 +23,15 @@ class TldPricingsTable
                     ->formatStateUsing(fn ($state) => '.'.ltrim((string) $state, '.'))
                     ->weight('bold')
                     ->searchable(),
-                TextColumn::make('register_price')->label('Register')->money('GBP')->sortable(),
+                TextColumn::make('register_price')->label('Register (UK)')->money('GBP')->sortable(),
+                // Blank means the extension is not sold internationally at all,
+                // so make that state obvious at a glance rather than showing $0.
+                TextColumn::make('register_price_usd')
+                    ->label('Register (Intl)')
+                    ->money('USD')
+                    ->placeholder('Not sold')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('renew_price')->label('Renew')->money('GBP')->toggleable(),
                 TextColumn::make('cost_price')->label('Cost')->money('GBP')->toggleable()->placeholder('—'),
                 TextColumn::make('markup')->label('Margin')->money('GBP')->toggleable()->placeholder('—'),

@@ -24,13 +24,13 @@
     <div class="mt-5 border-b border-slate-100 pb-5">
         @if ($monthly)
             <p x-show="cycle === 'monthly'">
-                <span class="text-4xl font-extrabold text-slate-900">£{{ number_format($monthly->amount, 2) }}</span>
+                <span class="text-4xl font-extrabold text-slate-900">{{ money($monthly->amount, $monthly->currency) }}</span>
                 <span class="text-slate-500">/month</span>
             </p>
         @endif
         @if ($yearly)
             <p x-show="cycle === 'yearly'" x-cloak>
-                <span class="text-4xl font-extrabold text-slate-900">£{{ number_format($yearly->amount, 2) }}</span>
+                <span class="text-4xl font-extrabold text-slate-900">{{ money($yearly->amount, $yearly->currency) }}</span>
                 <span class="text-slate-500">/year</span>
             </p>
         @endif
@@ -47,7 +47,7 @@
         @endforeach
     </ul>
 
-    <form method="POST" action="{{ route('cart.items.store') }}" class="mt-6">
+    <form method="POST" action="{{ region()->route('cart.items.store') }}" class="mt-6">
         @csrf
         <input type="hidden" name="item_type" value="hosting">
         <input type="hidden" name="product_id" value="{{ $product->id }}">

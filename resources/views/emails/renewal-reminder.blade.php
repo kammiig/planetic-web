@@ -5,7 +5,7 @@
         on <strong>{{ $renewalDate }}</strong>.</p>
 
     @if ($amount)
-        <p style="margin:0 0 16px;color:#334155;">Renewal amount: <strong>£{{ number_format((float) $amount, 2) }}</strong>.</p>
+        <p style="margin:0 0 16px;color:#334155;">Renewal amount: <strong>{{ money($amount, $currency ?? null, true) }}</strong>.</p>
     @endif
 
     <p style="margin:0 0 16px;color:#334155;">To keep your service active, please ensure your payment method is up to date.</p>
