@@ -42,11 +42,18 @@ class Region
         return new self($key, $config);
     }
 
+    /** Region key used when config/regions.php cannot be read at all. */
+    public const FALLBACK_KEY = 'uk';
+
     public static function defaultKey(): string
     {
-        $key = (string) config('regions.default', 'uk');
+        $key = (string) config('regions.default', self::FALLBACK_KEY);
 
-        return self::exists($key) ? $key : (string) array_key_first((array) config('regions.regions', []));
+        if (self::exists($key)) {
+            return $key;
+        }
+
+        return (string) (array_key_first((array) config('regions.regions', [])) ?? self::FALLBACK_KEY);
     }
 
     public static function default(): self
@@ -59,10 +66,21 @@ class Region
         return is_array(config("regions.regions.{$key}"));
     }
 
-    /** @return array<int, string> */
+    /**
+     * @return array<int, string>
+     *
+     * Never returns an empty list. routes/web.php registers the entire public
+     * site by iterating this, so an unreadable regions config — most plausibly
+     * a stale bootstrap/cache/config.php written before config/regions.php
+     * existed, i.e. a half-finished deploy — would otherwise register ZERO
+     * routes and 404 the whole site. Degrading to the single default region
+     * keeps the site up while the caches are rebuilt.
+     */
     public static function keys(): array
     {
-        return array_keys((array) config('regions.regions', []));
+        $keys = array_keys((array) config('regions.regions', []));
+
+        return $keys !== [] ? $keys : [self::FALLBACK_KEY];
     }
 
     /** @return array<int, self> */

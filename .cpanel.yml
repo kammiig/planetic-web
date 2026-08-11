@@ -11,9 +11,16 @@
 # cPanel locations — adjust if your host differs (check with `which php`).
 deployment:
   tasks:
-    - /bin/bash -c 'C=/opt/cpanel/composer/bin/composer; [ -f "$C" ] || C=$(command -v composer); [ -n "$C" ] && /usr/local/bin/php "$C" install --no-dev --optimize-autoloader --no-interaction || echo "composer not found — skipped"'
-    - /usr/local/bin/php artisan migrate --force
+    # Clear compiled caches FIRST. A config cache written by a previous deploy
+    # does not contain config files added in this one, so a deploy that fails
+    # partway would otherwise leave the app on a stale config/route cache —
+    # which breaks far worse than running uncached. Clearing first means the
+    # worst case is "slow but working" rather than a 500.
     - /usr/local/bin/php artisan optimize:clear
+    # Composer is optional and must never abort the migration/cache steps: most
+    # deploys add no dependencies. Falls back to whatever composer is on PATH.
+    - /bin/bash -c 'C=/opt/cpanel/composer/bin/composer; [ -r "$C" ] || C=$(command -v composer); if [ -n "$C" ] && [ -r "$C" ]; then /usr/local/bin/php "$C" install --no-dev --optimize-autoloader --no-interaction || echo "composer install failed — continuing"; else echo "composer not found — skipped"; fi'
+    - /usr/local/bin/php artisan migrate --force
     - /usr/local/bin/php artisan config:cache
     - /usr/local/bin/php artisan route:cache
     - /usr/local/bin/php artisan view:cache

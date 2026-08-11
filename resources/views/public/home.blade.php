@@ -155,7 +155,14 @@
                 </span>
                 <h3 class="mt-4 text-xl font-bold">Register a Domain</h3>
                 <p class="mt-1 text-sm text-slate-500">Secure the perfect name for your business.</p>
-                <p class="mt-5"><span class="text-3xl font-extrabold text-slate-900">from {{ money($cheapestTld) }}</span><span class="text-slate-500">/year</span></p>
+                {{-- Only quote a "from" price when this storefront actually
+                     publishes one. Never fall back to 0.00 (a free domain) or
+                     to another currency's figure. --}}
+                @if (! empty($cheapestTld))
+                    <p class="mt-5"><span class="text-3xl font-extrabold text-slate-900">from {{ money($cheapestTld) }}</span><span class="text-slate-500">/year</span></p>
+                @else
+                    <p class="mt-5"><span class="text-3xl font-extrabold text-slate-900">Search domains</span></p>
+                @endif
                 <ul class="mt-5 flex-1 space-y-2.5 text-sm text-slate-600">
                     @foreach (['Instant availability search', 'Free WHOIS privacy', 'Automatic Cloudflare DNS', 'Manage everything in one dashboard'] as $point)
                         <li class="flex items-start gap-2.5">

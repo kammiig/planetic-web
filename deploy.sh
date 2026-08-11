@@ -21,9 +21,20 @@ cd "$APP_DIR"
 echo "→ Pulling latest code"
 git pull origin main
 
-if [ -n "$COMPOSER" ]; then
+# Drop the compiled caches BEFORE anything else can fail. A cached config from
+# a previous deploy does not know about config files added in this one, so a
+# deploy that aborts midway would otherwise leave the app running on a stale
+# config/route cache — which is far more broken than running uncached.
+# Clearing first means the worst case is "slow but working".
+echo "→ Clearing stale caches"
+"$PHP" artisan optimize:clear
+
+if [ -n "$COMPOSER" ] && [ -r "$COMPOSER" ]; then
     echo "→ Installing PHP dependencies ($COMPOSER)"
-    "$PHP" "$COMPOSER" install --no-dev --optimize-autoloader --no-interaction
+    # Non-fatal: no new dependency is required by most deploys, and a missing
+    # composer must not abort the migration and cache steps below.
+    "$PHP" "$COMPOSER" install --no-dev --optimize-autoloader --no-interaction \
+        || echo "  ! composer install failed — continuing (only a problem if composer.json changed)"
 else
     echo "→ Composer not found — skipping dependency install (fine unless composer.json changed)"
 fi
@@ -32,7 +43,6 @@ echo "→ Migrating database"
 "$PHP" artisan migrate --force
 
 echo "→ Rebuilding caches"
-"$PHP" artisan optimize:clear
 "$PHP" artisan config:cache
 "$PHP" artisan route:cache
 "$PHP" artisan view:cache

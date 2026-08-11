@@ -376,6 +376,45 @@ class RegionalStorefrontTest extends TestCase
     }
 
     /* ------------------------------------------------------------------ */
+    /* Deploy resilience */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * routes/web.php registers the whole public site by iterating
+     * Region::keys(). A stale bootstrap/cache/config.php — written by an
+     * earlier deploy, before config/regions.php existed — makes the regions
+     * config invisible, which would register ZERO routes and 404 the entire
+     * site. It must degrade to the single default region instead.
+     */
+    public function test_an_unreadable_regions_config_still_yields_a_usable_region(): void
+    {
+        config()->set('regions.regions', []);
+        Region::flush();
+
+        $this->assertSame([Region::FALLBACK_KEY], Region::keys());
+        $this->assertSame(Region::FALLBACK_KEY, Region::defaultKey());
+
+        // Accessors must fall back to sane values rather than blowing up.
+        $region = Region::default();
+        $this->assertSame('GBP', $region->currency());
+        $this->assertSame('£', $region->symbol());
+        $this->assertSame('', $region->prefix());
+    }
+
+    public function test_the_homepage_survives_a_missing_from_price(): void
+    {
+        // A storefront with no priced TLD must not render "£0.00" (a free
+        // domain) or blow up on an undefined variable.
+        TldPricing::query()->update(['is_active' => false]);
+        \Illuminate\Support\Facades\Cache::flush();
+
+        $response = $this->get('/');
+
+        $response->assertOk();
+        $response->assertDontSee('from £0.00', false);
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Path translation */
     /* ------------------------------------------------------------------ */
 
