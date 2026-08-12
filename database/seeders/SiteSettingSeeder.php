@@ -83,6 +83,9 @@ class SiteSettingSeeder extends Seeder
 
             // ---- Checkout ----
             ['group' => 'checkout', 'key' => 'checkout.require_card_for_free_orders', 'type' => 'boolean', 'label' => 'Require a card on free (£0) orders', 'help' => 'When on, customers placing a free first-year order must save a card (via Stripe SetupIntent) for future renewals. When off, free orders complete without a card.', 'value' => '0'],
+
+            // ---- Analytics ----
+            ['group' => 'analytics', 'key' => 'analytics.ga_id', 'label' => 'Google Analytics ID', 'help' => 'Your Google Analytics 4 measurement ID (starts with G-). Loads gtag.js on the public site. Clear this field to turn analytics off.', 'value' => 'G-K9PWFCCCBL'],
         ];
     }
 }
