@@ -46,11 +46,13 @@ class CheckDomainAvailability
             'price' => $result['available'] ? $price : null,
             'currency' => $region->currency(),
             'symbol' => $region->symbol(),
-            // Kept for the homepage hero (only when the exact name is taken).
-            'suggestions' => $result['available'] ? [] : $this->suggestions($domain),
-            // A richer set of available alternative TLDs for the full search page.
-            // Guarded so the lightweight hero search does not pay the extra lookups.
-            'alternatives' => $withAlternatives ? $this->alternatives($domain) : [],
+            // Porkbun's checkDomain is rate-limited to ~1 request / 10s, so we
+            // keep a search to a SINGLE lookup whenever we can: alternatives and
+            // suggestions fire extra lookups, so they only run when the searched
+            // name is TAKEN (when the customer actually needs other options) and
+            // never both at once (hero → suggestions, full page → alternatives).
+            'suggestions' => (! $withAlternatives && ! $result['available']) ? $this->suggestions($domain) : [],
+            'alternatives' => ($withAlternatives && ! $result['available']) ? $this->alternatives($domain) : [],
         ];
     }
 
@@ -68,7 +70,10 @@ class CheckDomainAvailability
         $checked = 0;
 
         foreach ($this->suggestionTlds() as $tld) {
-            if (count($out) >= 8 || $checked >= 10) {
+            // Bounded low: Porkbun's checkDomain is rate-limited (~1/10s), so a
+            // large burst mostly gets rejected anyway and wastes the budget for
+            // the next search. A few, cached for 60s, is the sweet spot.
+            if (count($out) >= 4 || $checked >= 5) {
                 break;
             }
             if ($tld === $parsed->tld) {

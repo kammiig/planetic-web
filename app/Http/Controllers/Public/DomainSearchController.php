@@ -51,10 +51,34 @@ class DomainSearchController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
+            // The registrar (Porkbun) rate-limits availability checks to about
+            // one per 10 seconds. Tell the customer plainly that it is momentary
+            // and to try again, rather than showing a scary generic error.
+            if ($this->isRateLimited($e)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A lot of domains are being checked right now. Please wait about 10 seconds and search again.',
+                ], 429);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => $e->safeMessage,
             ], 502);
         }
+    }
+
+    /** Whether a registrar failure was its (transient) availability rate limit. */
+    private function isRateLimited(RegistrarException $e): bool
+    {
+        if (is_array($e->context) && strtoupper((string) ($e->context['code'] ?? '')) === 'RATE_LIMIT_EXCEEDED') {
+            return true;
+        }
+
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'rate limit')
+            || str_contains($message, 'rate_limit')
+            || str_contains($message, 'checks within');
     }
 }
