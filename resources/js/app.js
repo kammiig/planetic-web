@@ -9,6 +9,32 @@ window.Alpine = Alpine;
 Alpine.plugin(focus);
 Alpine.plugin(collapse);
 
+// A page served from the browser's back/forward cache keeps the CSRF token it
+// was rendered with. Signing in rotates that token, so returning to an earlier
+// page after login leaves every form on it posting a dead one — a 419 instead
+// of, say, the hosting plan the customer just clicked. Re-read the live token.
+window.addEventListener('pageshow', async (event) => {
+    if (!event.persisted) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/csrf-token', { headers: { Accept: 'application/json' } });
+        const { token } = await response.json();
+
+        if (!token) {
+            return;
+        }
+
+        document.querySelector('meta[name="csrf-token"]')?.setAttribute('content', token);
+        document.querySelectorAll('input[name="_token"]').forEach((input) => {
+            input.value = token;
+        });
+    } catch {
+        // Offline or blocked: leave the stale token, the 419 page still explains.
+    }
+});
+
 /*
 |--------------------------------------------------------------------------
 | On-site checkout (Stripe Payment Element)

@@ -54,6 +54,13 @@ class CartService
                 'session_id' => session()->getId(),
                 'currency' => Region::current()->currency(),
             ]);
+        } elseif ($cart->items->isEmpty() && $cart->currency !== Region::current()->currency()) {
+            // An empty cart has no prices to protect, so the lock re-stamps to
+            // the storefront the visitor is on now. Without this, a returning
+            // customer whose last cart was created in another region is stuck:
+            // every product here is unpriced in that currency, so nothing can
+            // be added at all.
+            $cart->update(['currency' => Region::current()->currency()]);
         }
 
         // Claim a guest cart once the visitor logs in.

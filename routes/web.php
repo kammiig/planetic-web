@@ -94,6 +94,19 @@ Route::get('/region-hint', RegionHintController::class)
     ->middleware('throttle:60,1')
     ->name('region.hint');
 
+/*
+| Signing in regenerates the session, which rotates the CSRF token. A page the
+| visitor left open — or one the browser restores from its back/forward cache —
+| still carries the pre-login token, so every form on it (the "Choose plan"
+| buttons especially) would 419. The frontend re-reads the live token from here
+| when such a page is restored.
+*/
+Route::get('/csrf-token', fn () => response()
+    ->json(['token' => csrf_token()])
+    ->header('Cache-Control', 'no-store'))
+    ->middleware('throttle:60,1')
+    ->name('csrf.token');
+
 // SEO — one sitemap covering every regional tree.
 Route::get('/sitemap.xml', [\App\Http\Controllers\Public\SeoController::class, 'sitemap'])->name('sitemap');
 

@@ -10,6 +10,7 @@ use App\Services\Cart\CartService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class CartController extends Controller
@@ -28,7 +29,19 @@ class CartController extends Controller
 
     public function store(AddCartItemRequest $request): JsonResponse|RedirectResponse
     {
-        $item = $this->cart->addItem($request->validated());
+        try {
+            $item = $this->cart->addItem($request->validated());
+        } catch (ValidationException $e) {
+            if ($request->expectsJson()) {
+                throw $e;
+            }
+
+            // Storefront pages render flash messages but not the error bag, so
+            // redirecting back with only validation errors reads to the
+            // customer as a button that does nothing at all.
+            return back()->with('error', $e->validator->errors()->first());
+        }
+
         $cart = $this->cart->currentCart()->load('items');
 
         if ($request->expectsJson()) {

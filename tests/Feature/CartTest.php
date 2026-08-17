@@ -89,6 +89,38 @@ class CartTest extends TestCase
         $this->assertDatabaseMissing('cart_items', ['id' => $item->id]);
     }
 
+    public function test_signed_in_customer_with_an_empty_cart_from_another_region_can_still_add_a_plan(): void
+    {
+        $user = $this->createUser();
+        $plan = Product::query()->whereHas('hostingPackage')->firstOrFail();
+
+        \App\Models\Cart::create(['user_id' => $user->id, 'session_id' => 'old-session', 'currency' => 'USD']);
+
+        $this->actingAs($user)
+            ->post('/cart/items', ['item_type' => 'hosting', 'product_id' => $plan->id, 'billing_cycle' => 'monthly'])
+            ->assertRedirect(route('cart.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('cart_items', ['product_id' => $plan->id, 'unit_price' => $plan->priceFor('monthly', 'GBP')->amount]);
+    }
+
+    public function test_a_plan_that_cannot_be_priced_reports_why_instead_of_failing_silently(): void
+    {
+        $user = $this->createUser();
+        $plan = Product::query()->whereHas('hostingPackage')->firstOrFail();
+
+        // A locked currency the catalogue has no prices in, held by an item
+        // already in the basket.
+        $cart = \App\Models\Cart::create(['user_id' => $user->id, 'session_id' => 'old-session', 'currency' => 'EUR']);
+        $cart->items()->create([
+            'item_type' => ItemType::WebsitePackage->value, 'name' => 'Existing', 'quantity' => 1, 'unit_price' => 200, 'total' => 200,
+        ]);
+
+        $this->actingAs($user)
+            ->post('/cart/items', ['item_type' => 'hosting', 'product_id' => $plan->id, 'billing_cycle' => 'monthly'])
+            ->assertSessionHas('error');
+    }
+
     public function test_guest_cart_is_claimed_after_login(): void
     {
         // Add as a guest.
