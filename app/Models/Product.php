@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Product extends Model
 {
     protected $fillable = [
-        'name', 'slug', 'type', 'description', 'is_active', 'sort_order',
+        'name', 'slug', 'type', 'description', 'is_active', 'is_hidden', 'sort_order',
     ];
 
     protected function casts(): array
@@ -20,6 +20,7 @@ class Product extends Model
         return [
             'type' => ProductType::class,
             'is_active' => 'boolean',
+            'is_hidden' => 'boolean',
         ];
     }
 
@@ -51,6 +52,19 @@ class Product extends Model
     public function scopeOfType(Builder $query, ProductType|string $type): Builder
     {
         return $query->where('type', $type instanceof ProductType ? $type->value : $type);
+    }
+
+    /**
+     * Products the public pricing tables are allowed to list.
+     *
+     * A hidden product is still active — it prices, adds to the cart and checks
+     * out normally — it simply never appears in a storefront grid. That is what
+     * makes a private, link-only plan possible: the direct add-to-cart URL
+     * (route "cart.add") keeps working while casual browsers never see it.
+     */
+    public function scopeListed(Builder $query): Builder
+    {
+        return $query->where('is_hidden', false);
     }
 
     /** Cheapest active price for display ("from £x"). */

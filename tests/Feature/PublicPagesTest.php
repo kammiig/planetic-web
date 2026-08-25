@@ -90,6 +90,36 @@ class PublicPagesTest extends TestCase
             ->assertDontSee('Google review');
     }
 
+    public function test_domain_page_renders_the_same_testimonials_as_the_home_page(): void
+    {
+        \App\Models\Testimonial::query()->delete();
+        \App\Models\Testimonial::create([
+            'author_name' => 'Shared Sam', 'body' => 'One review, edited once, shown on both pages.',
+            'rating' => 5, 'source' => 'google', 'is_verified' => true, 'is_active' => true, 'sort_order' => 1,
+        ]);
+
+        // Same admin-managed rows, same component — editing a testimonial must
+        // never leave the two pages disagreeing.
+        foreach (['/', '/domains'] as $uri) {
+            $this->get($uri)
+                ->assertOk()
+                ->assertSee('One review, edited once, shown on both pages.')
+                ->assertSee('Verified Google review')
+                ->assertSee('5.0 out of 5');
+        }
+    }
+
+    public function test_domain_page_drops_a_testimonial_deactivated_in_the_admin(): void
+    {
+        \App\Models\Testimonial::query()->delete();
+        \App\Models\Testimonial::create([
+            'author_name' => 'Retired Rita', 'body' => 'A review that has since been switched off.',
+            'rating' => 5, 'source' => 'manual', 'is_active' => false, 'sort_order' => 1,
+        ]);
+
+        $this->get('/domains')->assertOk()->assertDontSee('A review that has since been switched off.');
+    }
+
     #[DataProvider('publicRoutes')]
     public function test_public_pages_render(string $uri): void
     {

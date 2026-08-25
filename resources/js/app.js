@@ -603,6 +603,10 @@ Alpine.data('domainSearch', (config = {}) => ({
         const list = [...this.alternatives];
         if (this.sort === 'price-asc') return list.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
         if (this.sort === 'price-desc') return list.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+        if (this.sort === 'name') return list.sort((a, b) => a.domain.localeCompare(b.domain));
+        // "Popularity" is the order the server sent, which follows the admin's
+        // TLD price-book sort order — so the extensions we actually want to
+        // sell lead the list.
         return list;
     },
     csrf() {

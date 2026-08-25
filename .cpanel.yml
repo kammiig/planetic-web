@@ -33,3 +33,8 @@ deployment:
     # Static images (e.g. the default Open Graph share image) must also reach
     # the live document root, same reason as the build assets above.
     - /bin/bash -c '[ -d "$HOME/public_html" ] && [ -d ./public/images ] && /usr/bin/rsync -a ./public/images/ "$HOME/public_html/images/" || true'
+    # Root-level static files (the favicon set, robots.txt) sit directly in
+    # public/, which is deliberately NOT rsynced wholesale — index.php and
+    # .htaccess in public_html were adjusted for this host and must survive.
+    # So copy those files by name.
+    - /bin/bash -c '[ -d "$HOME/public_html" ] && /bin/cp -f ./public/favicon.ico ./public/favicon.svg ./public/apple-touch-icon.png ./public/robots.txt "$HOME/public_html/" || true'

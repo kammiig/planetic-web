@@ -4,13 +4,16 @@ namespace App\Filament\Resources\HostingPackages\Schemas;
 
 use App\Enums\ProductType;
 use App\Filament\Support\PriceFields;
+use App\Filament\Support\ProductVisibility;
 use App\Models\Product;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
@@ -54,6 +57,23 @@ class HostingPackageForm
                         Toggle::make('is_popular')->label('Mark as popular / recommended'),
                         Toggle::make('is_active')->label('Active (visible on the site)')->default(true),
                         TextInput::make('sort_order')->numeric()->default(0)->helperText('Lower numbers appear first.'),
+
+                        // Visibility, not availability. Hiding removes the plan
+                        // from the public pricing tables while leaving it fully
+                        // buyable through the private link below.
+                        Toggle::make(ProductVisibility::FIELD)
+                            ->label('Hide from the public pricing tables')
+                            ->helperText('The plan stays active and buyable — it just stops appearing on the Hosting and Home pages. Share the private link below with the customers who should get it.')
+                            ->default(false)
+                            ->live()
+                            ->dehydrated(false),
+                        TextEntry::make('direct_cart_link')
+                            ->label('Private add-to-cart link')
+                            ->state(fn (Get $get) => static::directLinkFor($get('product_id')))
+                            ->copyable()
+                            ->copyMessage('Link copied')
+                            ->helperText('Opens the cart with this plan already added. Append ?cycle=yearly for the yearly price.')
+                            ->columnSpanFull(),
                     ]),
 
                 Section::make('Pricing')
@@ -92,5 +112,13 @@ class HostingPackageForm
                             ->helperText('Custom feature list for the plan card. Leave empty to auto-generate from the limits above.'),
                     ]),
             ]);
+    }
+
+    /** The private add-to-cart URL for the linked product, or a hint if unsaved. */
+    private static function directLinkFor(mixed $productId): string
+    {
+        $link = ProductVisibility::directCartLink(Product::find($productId));
+
+        return $link ?? 'Save the plan with a linked product to generate its link.';
     }
 }

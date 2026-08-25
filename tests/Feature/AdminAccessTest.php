@@ -3,7 +3,12 @@
 namespace Tests\Feature;
 
 use App\Enums\RoleName;
+use App\Models\HostingPackage;
+use App\Models\Product;
+use App\Models\WebsitePackage;
+use Database\Seeders\HostingPackageSeeder;
 use Database\Seeders\ProductSeeder;
+use Database\Seeders\WebsitePackageSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -36,6 +41,28 @@ class AdminAccessTest extends TestCase
         $admin = $this->createUser(RoleName::SuperAdmin);
 
         $this->actingAs($admin)->get('/admin')->assertOk();
+    }
+
+    public function test_super_admin_can_open_the_product_and_plan_screens(): void
+    {
+        $this->seed([ProductSeeder::class, HostingPackageSeeder::class, WebsitePackageSeeder::class]);
+        $admin = $this->createUser(RoleName::SuperAdmin);
+
+        $hosting = HostingPackage::firstOrFail();
+        $website = WebsitePackage::firstOrFail();
+        $product = Product::firstOrFail();
+
+        // These screens carry the "hide from pricing tables" toggle and the
+        // private add-to-cart link, so a broken component would 500 here.
+        foreach ([
+            '/admin/products',
+            '/admin/products/'.$product->id.'/edit',
+            '/admin/hosting-packages',
+            '/admin/hosting-packages/'.$hosting->id.'/edit',
+            '/admin/website-packages/'.$website->id.'/edit',
+        ] as $uri) {
+            $this->actingAs($admin)->get($uri)->assertOk();
+        }
     }
 
     public function test_staff_can_view_resources_their_role_allows(): void

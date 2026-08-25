@@ -156,25 +156,88 @@
         </section>
     @endif
 
-    {{-- Renewal notice --}}
-    <section class="container-px pb-16">
-        <div class="alert alert-info mx-auto max-w-3xl">
-            <h2 class="text-lg font-bold">About renewals</h2>
-            <p class="mt-2">
-                The {{ money_compact($price) }} website package includes your domain and hosting free for the
-                <strong>first year only</strong>. After the first year, standard domain and hosting renewal charges apply.
-                See our <a href="{{ region()->route('legal.renewal') }}" class="font-semibold underline">Renewal Policy</a> for full details.
-            </p>
-        </div>
-    </section>
+    {{-- ===================== Closing CTA ===================== --}}
+    {{-- The renewal honesty note and the buy button used to sit apart as two
+         bare blocks. They belong together: the last thing a customer reads
+         before paying should be exactly what they pay now and what renews
+         later, in one place. --}}
+    <section class="relative overflow-hidden hero-aurora text-white">
+        <div class="absolute inset-0 hero-grid opacity-60" aria-hidden="true"></div>
 
-    {{-- CTA --}}
-    <section class="container-px pb-20 text-center">
-        <form method="POST" action="{{ region()->route('cart.items.store') }}" class="inline">
-            @csrf
-            <input type="hidden" name="item_type" value="website_package">
-            @if ($product)<input type="hidden" name="product_id" value="{{ $product->id }}">@endif
-            <button type="submit" class="btn-primary">Get your website for {{ money_compact($price) }}</button>
-        </form>
+        <div class="container-px relative section">
+            <div class="mx-auto grid max-w-5xl items-center gap-10 lg:grid-cols-2 lg:gap-14">
+                {{-- Pitch --}}
+                <div>
+                    <p class="eyebrow">Ready when you are</p>
+                    <h2 class="mt-3 text-3xl font-extrabold sm:text-4xl">
+                        Your complete website for <span class="gradient-text">{{ money_compact($price) }}</span>
+                    </h2>
+                    <p class="mt-4 max-w-lg text-lg text-slate-300">
+                        One payment covers the design, the build and the launch — plus your domain and hosting for the
+                        first year. No monthly fee to start, and nothing technical for you to set up.
+                    </p>
+
+                    <div class="mt-8 flex flex-wrap items-center gap-3">
+                        <form method="POST" action="{{ region()->route('cart.items.store') }}">
+                            @csrf
+                            <input type="hidden" name="item_type" value="website_package">
+                            @if ($product)<input type="hidden" name="product_id" value="{{ $product->id }}">@endif
+                            <button type="submit" class="btn-primary">Get your website for {{ money_compact($price) }}</button>
+                        </form>
+                        <a href="{{ region()->route('contact') }}" class="btn-ghost-dark">Talk to us first</a>
+                    </div>
+
+                    <ul class="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-300">
+                        @foreach ([
+                            ['Secure Stripe checkout', 'M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM7 11V7a5 5 0 0 1 10 0v4'],
+                            ['Live in about two weeks', 'M12 7v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z'],
+                            ['Real people, UK support', 'M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z'],
+                        ] as [$label, $icon])
+                            <li class="flex items-center gap-2">
+                                <svg class="h-4 w-4 flex-shrink-0 text-accent-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="{{ $icon }}"/></svg>
+                                {{ $label }}
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+
+                {{-- What you actually pay --}}
+                <div class="rounded-[22px] border border-white/12 bg-white/[0.06] p-6 shadow-dark backdrop-blur sm:p-8">
+                    <h3 class="text-sm font-semibold uppercase tracking-[0.12em] text-slate-300">What you pay today</h3>
+
+                    <dl class="mt-5 space-y-3 text-sm">
+                        @foreach ([
+                            ['Bespoke website, built for you', money_compact($price)],
+                            ['Domain name — first year', 'Free'],
+                            ['Hosting, SSL &amp; email setup — first year', 'Free'],
+                        ] as [$item, $amount])
+                            <div class="flex items-baseline justify-between gap-4 border-b border-white/10 pb-3">
+                                <dt class="text-slate-300">{!! $item !!}</dt>
+                                <dd class="whitespace-nowrap font-semibold text-white">{{ $amount }}</dd>
+                            </div>
+                        @endforeach
+                        <div class="flex items-baseline justify-between gap-4 pt-1">
+                            <dt class="font-semibold text-white">Total today</dt>
+                            <dd class="text-3xl font-extrabold text-white">{{ money_compact($price) }}</dd>
+                        </div>
+                    </dl>
+
+                    {{-- Renewal honesty. Deliberately inside the price summary
+                         rather than in a separate box further up the page: it is
+                         part of the price, so it is read as part of the price. --}}
+                    <div class="mt-6 rounded-[14px] border border-accent-cyan/25 bg-accent-cyan/10 p-4">
+                        <p class="flex items-center gap-2 text-sm font-bold text-white">
+                            <svg class="h-4 w-4 flex-shrink-0 text-accent-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                            After the first year
+                        </p>
+                        <p class="mt-1.5 text-sm text-slate-200">
+                            Your domain and hosting renew at our standard rates — we remind you well before anything is
+                            charged. Full details in the
+                            <a href="{{ region()->route('legal.renewal') }}" class="font-semibold text-white underline decoration-accent-cyan underline-offset-2">Renewal Policy</a>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
 @endsection

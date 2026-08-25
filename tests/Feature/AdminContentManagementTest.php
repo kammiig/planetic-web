@@ -78,6 +78,36 @@ class AdminContentManagementTest extends TestCase
         $this->get('/hosting')->assertOk()->assertSee('7.77');
     }
 
+    public function test_hiding_a_plan_in_admin_removes_it_from_pricing_but_keeps_the_link_working(): void
+    {
+        $admin = $this->createUser(RoleName::SuperAdmin);
+        $package = HostingPackage::whereHas('product', fn ($q) => $q->where('slug', 'starter-hosting'))->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test(EditHostingPackage::class, ['record' => $package->getRouteKey()])
+            ->assertFormSet(['product_is_hidden' => false])
+            ->fillForm(['product_is_hidden' => true])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertTrue($package->product->fresh()->is_hidden);
+
+        // Gone from the storefront, still buyable by its private link.
+        $this->get('/hosting')->assertOk()->assertDontSee('Starter Hosting');
+        $this->get('/cart/add/starter-hosting')->assertRedirect('/cart');
+
+        // And the toggle comes back off again.
+        Livewire::actingAs($admin)
+            ->test(EditHostingPackage::class, ['record' => $package->getRouteKey()])
+            ->assertFormSet(['product_is_hidden' => true])
+            ->fillForm(['product_is_hidden' => false])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertFalse($package->product->fresh()->is_hidden);
+        $this->get('/hosting')->assertOk()->assertSee('Starter Hosting');
+    }
+
     public function test_changing_whm_package_name_in_admin_persists_for_provisioning(): void
     {
         $admin = $this->createUser(RoleName::SuperAdmin);

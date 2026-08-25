@@ -72,6 +72,38 @@ class DomainSearchTest extends TestCase
         $this->assertTrue($suggestions->contains('taken-name.co.uk'));
     }
 
+    public function test_full_search_offers_alternatives_even_when_the_domain_is_available(): void
+    {
+        // The searched name AND two other extensions are all free.
+        $this->fakePorkbun(['free-name.com', 'free-name.co.uk', 'free-name.net']);
+
+        $response = $this->postJson('/domains/search', ['domain' => 'free-name.com', 'full' => true])
+            ->assertOk()
+            ->assertJson(['success' => true, 'available' => true]);
+
+        // The "More options" list is not reserved for taken names: a customer
+        // who can have the .com usually still wants the .co.uk beside it.
+        $alternatives = collect($response->json('alternatives'))->pluck('domain');
+        $this->assertTrue($alternatives->contains('free-name.co.uk'));
+        $this->assertFalse($alternatives->contains('free-name.com'), 'the searched name is not repeated as an alternative');
+    }
+
+    public function test_alternatives_are_bounded_by_configuration(): void
+    {
+        config()->set('domain.alternatives.limit', 2);
+
+        // Everything is available, so only the cap can limit the list.
+        Http::fake(['api.porkbun.com/*' => Http::response([
+            'status' => 'SUCCESS',
+            'response' => ['avail' => 'yes', 'price' => '9.68', 'premium' => 'no'],
+        ])]);
+
+        $response = $this->postJson('/domains/search', ['domain' => 'bounded-name.com', 'full' => true])
+            ->assertOk();
+
+        $this->assertCount(2, $response->json('alternatives'));
+    }
+
     public function test_invalid_domain_is_rejected_with_validation_error(): void
     {
         // No Http::fake registered — if the controller tried to reach the

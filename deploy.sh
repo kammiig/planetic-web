@@ -52,6 +52,10 @@ echo "→ Syncing static assets to document root"
 if [ -d "$HOME/public_html" ]; then
     [ ! -L "$HOME/public_html/build" ] && rsync -a --delete ./public/build/ "$HOME/public_html/build/"
     [ -d ./public/images ] && rsync -a ./public/images/ "$HOME/public_html/images/"
+    # Root-level static files (favicon set, robots.txt). public/ is never
+    # rsynced wholesale — public_html's index.php/.htaccess were adjusted for
+    # this host — so these are copied by name.
+    cp -f ./public/favicon.ico ./public/favicon.svg ./public/apple-touch-icon.png ./public/robots.txt "$HOME/public_html/" 2>/dev/null || true
 fi
 
 echo "✓ Deployed $(git rev-parse --short HEAD)"

@@ -58,7 +58,7 @@
         '@type' => 'Organization',
         'name' => setting('company.name', config('app.name')),
         'url' => config('app.url'),
-        'logo' => asset('favicon.ico'),
+        'logo' => asset('images/icon-512.png'),
         'description' => $defaultDescription,
         'email' => setting('contact.email', 'support@planeticweb.com'),
         'contactPoint' => [
@@ -127,7 +127,7 @@
         <meta name="twitter:image" content="{{ $ogImage }}">
     @endif
 
-    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    @include('partials.favicon')
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 

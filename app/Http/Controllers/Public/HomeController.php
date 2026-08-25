@@ -18,6 +18,9 @@ class HomeController extends Controller
         $hostingPlans = Product::query()
             ->where('type', ProductType::Hosting->value)
             ->where('is_active', true)
+            // Hidden plans stay buyable by direct link but never appear in a
+            // public grid — see Product::scopeListed().
+            ->listed()
             ->whereHas('hostingPackage', fn ($q) => $q->where('is_active', true))
             ->with(['activePrices', 'hostingPackage'])
             ->orderBy('sort_order')

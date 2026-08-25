@@ -69,6 +69,21 @@ $storefront = function (): void {
         Route::get('/', [CartController::class, 'index'])->name('index');
         Route::post('/items', [CartController::class, 'store'])->name('items.store');
         Route::delete('/items/{cartItem}', [CartController::class, 'destroy'])->name('items.destroy');
+
+        /*
+        | Direct add-to-cart link, e.g. /cart/add/starter-hosting?cycle=yearly.
+        |
+        | This is how an UNLISTED plan (products.is_hidden) is sold: it is
+        | withheld from every public pricing table, and this link — sent
+        | privately to a specific customer — is the only way to reach it. It
+        | works for listed plans too, which makes it usable in emails and ads.
+        |
+        | Prices are still resolved server-side from the catalogue in the
+        | storefront's currency, so the URL cannot influence what is charged.
+        */
+        Route::get('/add/{slug}', [CartController::class, 'add'])
+            ->middleware('throttle:30,1')
+            ->name('add');
     });
 };
 

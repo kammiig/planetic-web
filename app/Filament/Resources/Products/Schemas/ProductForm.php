@@ -25,7 +25,13 @@ class ProductForm
                 Textarea::make('description')
                     ->columnSpanFull(),
                 Toggle::make('is_active')
+                    ->label('Active')
+                    ->helperText('Off means the product cannot be bought at all.')
                     ->required(),
+                Toggle::make('is_hidden')
+                    ->label('Hide from pricing tables')
+                    ->helperText('Keeps the product fully active and buyable, but removes it from the public pricing tables. Use the direct add-to-cart link on the product list to sell it privately.')
+                    ->default(false),
                 TextInput::make('sort_order')
                     ->required()
                     ->numeric()

@@ -29,6 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('Planetic Web Admin')
+            ->favicon(asset('favicon.svg'))
             ->colors([
                 'primary' => Color::hex('#2563EB'),
                 'info' => Color::hex('#0284C7'),

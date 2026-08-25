@@ -14,6 +14,9 @@ class PricingController extends Controller
     {
         $plans = Product::ofType(ProductType::Hosting)
             ->active()
+            // Hidden plans are sold privately by link only — see
+            // Product::scopeListed() and the "cart.add" route.
+            ->listed()
             ->whereHas('hostingPackage', fn ($q) => $q->where('is_active', true))
             ->with(['activePrices', 'hostingPackage'])
             ->orderBy('sort_order')

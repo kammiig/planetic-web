@@ -47,33 +47,40 @@ class CheckDomainAvailability
             'currency' => $region->currency(),
             'symbol' => $region->symbol(),
             // Porkbun's checkDomain is rate-limited to ~1 request / 10s, so we
-            // keep a search to a SINGLE lookup whenever we can: alternatives and
-            // suggestions fire extra lookups, so they only run when the searched
-            // name is TAKEN (when the customer actually needs other options) and
-            // never both at once (hero → suggestions, full page → alternatives).
+            // keep the compact hero search to a SINGLE lookup whenever we can:
+            // its suggestions only fire when the searched name is TAKEN. The
+            // full search page always lists alternatives (that is its "More
+            // options" section), bounded by config('domain.alternatives'). The
+            // two never run together — hero → suggestions, page → alternatives.
             'suggestions' => (! $withAlternatives && ! $result['available']) ? $this->suggestions($domain) : [],
-            'alternatives' => ($withAlternatives && ! $result['available']) ? $this->alternatives($domain) : [],
+            // The full search page always offers other extensions, whether or
+            // not the searched name was free — a customer who can have
+            // example.com often still wants .co.uk and .net alongside it.
+            'alternatives' => $withAlternatives ? $this->alternatives($domain) : [],
         ];
     }
 
     /**
-     * Up to 8 available alternative-TLD variants for the "More options" list.
-     * Bounded to keep registrar calls (and latency) in check; all results are
-     * cached for 60s so repeat searches are instant.
+     * Available alternative-TLD variants for the page's "More options" list.
+     *
+     * Bounded by config('domain.alternatives') to keep registrar calls (and
+     * latency) in check: a burst that outruns a registrar's rate limit mostly
+     * gets rejected anyway and wastes the budget for the next search. Every
+     * lookup is cached for 60s, so repeat searches are instant and a customer
+     * changing the sort order costs nothing.
      *
      * @return array<int, array{domain: string, available: bool, price: string}>
      */
     private function alternatives(string $domain): array
     {
         $parsed = DomainName::parse($domain);
+        $limit = max(0, (int) config('domain.alternatives.limit', 6));
+        $maxChecks = max($limit, (int) config('domain.alternatives.max_checks', 10));
         $out = [];
         $checked = 0;
 
         foreach ($this->suggestionTlds() as $tld) {
-            // Bounded low: Porkbun's checkDomain is rate-limited (~1/10s), so a
-            // large burst mostly gets rejected anyway and wastes the budget for
-            // the next search. A few, cached for 60s, is the sweet spot.
-            if (count($out) >= 4 || $checked >= 5) {
+            if (count($out) >= $limit || $checked >= $maxChecks) {
                 break;
             }
             if ($tld === $parsed->tld) {

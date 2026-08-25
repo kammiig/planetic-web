@@ -2,8 +2,9 @@
 
 namespace App\Filament\Resources\WebsitePackages\Schemas;
 
-use App\Filament\Support\PriceFields;
 use App\Enums\ProductType;
+use App\Filament\Support\ProductVisibility;
+use App\Filament\Support\PriceFields;
 use App\Models\Product;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -11,7 +12,9 @@ use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
@@ -50,6 +53,21 @@ class WebsitePackageForm
                         Textarea::make('description')->rows(3)->columnSpanFull(),
                         Toggle::make('is_active')->label('Active (visible on the site)')->default(true),
                         TextInput::make('sort_order')->numeric()->default(0),
+
+                        // Visibility, not availability — see SyncsProductVisibility.
+                        Toggle::make(ProductVisibility::FIELD)
+                            ->label('Hide from the public pricing tables')
+                            ->helperText('The package stays active and buyable — it just stops appearing in public listings. Share the private link below with the customers who should get it.')
+                            ->default(false)
+                            ->live()
+                            ->dehydrated(false),
+                        TextEntry::make('direct_cart_link')
+                            ->label('Private add-to-cart link')
+                            ->state(fn (Get $get) => static::directLinkFor($get('product_id')))
+                            ->copyable()
+                            ->copyMessage('Link copied')
+                            ->helperText('Opens the cart with this package already added.')
+                            ->columnSpanFull(),
                     ]),
 
                 Section::make('Pricing')
@@ -99,5 +117,13 @@ class WebsitePackageForm
                             ->addActionLabel('Add question'),
                     ]),
             ]);
+    }
+
+    /** The private add-to-cart URL for the linked product, or a hint if unsaved. */
+    private static function directLinkFor(mixed $productId): string
+    {
+        $link = ProductVisibility::directCartLink(Product::find($productId));
+
+        return $link ?? 'Save the package with a linked product to generate its link.';
     }
 }

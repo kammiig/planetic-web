@@ -137,31 +137,40 @@
                             </div>
                         </div>
 
-                        {{-- More options --}}
+                        {{-- ===================== More options ===================== --}}
+                        {{-- Alternative extensions for the same name. Shown for
+                             an available domain too, not just a taken one — a
+                             customer who can have example.com usually still
+                             wants .co.uk and .net beside it. --}}
                         <template x-if="alternatives.length">
-                            <div class="mt-10">
-                                <div class="flex items-center justify-between">
-                                    <h2 class="text-xl font-bold">More options</h2>
-                                    <label class="flex items-center gap-2 text-sm text-slate-500">
-                                        <span class="sr-only sm:not-sr-only">Sort by</span>
-                                        <select x-model="sort" class="input h-10 w-auto py-1 text-sm">
+                            <div class="mt-12">
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                    <h2 class="text-lg font-bold text-slate-900">More options</h2>
+                                    <label class="flex items-center gap-2">
+                                        <span class="sr-only">Sort alternative domains by</span>
+                                        <select x-model="sort"
+                                                class="h-10 cursor-pointer rounded-[10px] border border-slate-300 bg-white px-3 pr-8 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-400 focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/15">
                                             <option value="popularity">Popularity</option>
                                             <option value="price-asc">Price: low to high</option>
                                             <option value="price-desc">Price: high to low</option>
+                                            <option value="name">Name: A–Z</option>
                                         </select>
                                     </label>
                                 </div>
 
-                                <ul class="mt-4 overflow-hidden rounded-[16px] border border-slate-200">
+                                <ul class="mt-4 divide-y divide-slate-200 overflow-hidden rounded-[16px] border border-slate-200 bg-white shadow-soft">
                                     <template x-for="alt in sortedAlternatives" :key="alt.domain">
-                                        <li class="flex items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3 last:border-b-0 odd:bg-slate-50/60">
-                                            <span class="min-w-0 break-all font-medium text-slate-900" x-text="alt.domain"></span>
-                                            <div class="flex items-center gap-4">
-                                                <span class="whitespace-nowrap text-right text-sm">
-                                                    <span class="font-bold text-slate-900"><span x-text="symbol"></span><span x-text="alt.price"></span></span>
-                                                    <span class="block text-xs text-slate-400">For first year</span>
+                                        <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition hover:bg-slate-50 sm:gap-6">
+                                            <span class="min-w-0 flex-1 break-all text-base font-semibold text-slate-900" x-text="alt.domain"></span>
+                                            <div class="flex items-center gap-4 sm:gap-6">
+                                                <span class="whitespace-nowrap text-right">
+                                                    <span class="text-lg font-extrabold text-slate-900"><span x-text="alt.symbol || symbol"></span><span x-text="alt.price"></span></span>
+                                                    <span class="block text-xs text-slate-500">For the first year</span>
                                                 </span>
-                                                <button type="button" class="btn-secondary btn-sm" @click="add('domain_registration', alt.domain, alt.domain)" x-bind:disabled="adding === alt.domain">
+                                                <button type="button"
+                                                        class="min-w-[76px] rounded-[10px] border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:border-slate-900 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                                        @click="add('domain_registration', alt.domain, alt.domain)"
+                                                        x-bind:disabled="adding === alt.domain">
                                                     <span x-show="adding !== alt.domain">Get</span>
                                                     <span x-show="adding === alt.domain" x-cloak>Adding…</span>
                                                 </button>
@@ -169,6 +178,8 @@
                                         </li>
                                     </template>
                                 </ul>
+
+                                <p class="mt-3 text-xs text-slate-500">All prices are for the first year. Domains renew annually at our standard rates — see the <a href="{{ region()->route('legal.renewal') }}" class="font-medium underline">Renewal Policy</a>.</p>
                             </div>
                         </template>
                     </div>
@@ -192,39 +203,18 @@
         </section>
 
         {{-- ===================== Trust / reviews ===================== --}}
-        <section class="bg-slate-900 text-white">
-            <div class="container-px py-12">
-                <div class="mx-auto max-w-4xl text-center">
-                    <div class="flex items-center justify-center gap-1 text-warning" aria-hidden="true">
-                        @for ($i = 0; $i < 5; $i++)
-                            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 9.2 8.6 2 9.2l5.5 4.7L5.8 21 12 17l6.2 4-1.7-7.1L22 9.2l-7.2-.6z"/></svg>
-                        @endfor
-                    </div>
-                    <p class="mt-3 text-lg font-bold">Trusted by businesses across the UK</p>
-                    <p class="text-sm text-slate-300">Real people, real support — here's what our customers say.</p>
+        {{-- Identical component and data as the home page, so a testimonial
+             edited in the admin updates both pages at once. --}}
+        <x-testimonials-section :testimonials="$testimonials" class="bg-slate-50 section" />
 
-                    <div class="mt-8 grid gap-4 text-left sm:grid-cols-3">
-                        @foreach ([
-                            ['Amazing support', 'Genuinely helpful team — they sorted my domain, hosting and email in a day.', 'Ilja M.'],
-                            ['Fast and insightful', 'Quick to respond and they fixed my DNS issue without any fuss. Highly recommend.', 'Matt S.'],
-                            ['Great from start to finish', 'They built our website and handled everything technical. Brilliant value.', 'John-Mark A.'],
-                        ] as [$title, $body, $name])
-                            <figure class="rounded-[14px] border border-white/10 bg-white/5 p-5">
-                                <div class="flex gap-0.5 text-warning" aria-hidden="true">
-                                    @for ($i = 0; $i < 5; $i++)<svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 9.2 8.6 2 9.2l5.5 4.7L5.8 21 12 17l6.2 4-1.7-7.1L22 9.2l-7.2-.6z"/></svg>@endfor
-                                </div>
-                                <figcaption class="mt-2 font-semibold">{{ $title }}</figcaption>
-                                <blockquote class="mt-1 text-sm text-slate-300">“{{ $body }}”</blockquote>
-                                <p class="mt-2 text-xs text-slate-400">— {{ $name }}</p>
-                            </figure>
-                        @endforeach
-                    </div>
-
-                    <div class="mt-8 rounded-[14px] border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-                        About domain renewals: domains register for one year and renew annually. We remind you well before your renewal date — see the
-                        <a href="{{ region()->route('legal.renewal') }}" class="font-semibold text-white underline">Renewal Policy</a>.
-                    </div>
-                </div>
+        {{-- ===================== Renewal honesty note ===================== --}}
+        <section class="container-px pb-14">
+            <div class="alert alert-info mx-auto max-w-3xl">
+                <h2 class="text-base font-bold">About domain renewals</h2>
+                <p class="mt-1 text-sm">
+                    Domains register for one year and renew annually. We remind you well before your renewal date — see the
+                    <a href="{{ region()->route('legal.renewal') }}" class="font-semibold underline">Renewal Policy</a>.
+                </p>
             </div>
         </section>
     </div>

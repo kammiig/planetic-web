@@ -148,6 +148,26 @@ return [
 
     'suggestion_tlds' => ['co.uk', 'com', 'net', 'org', 'io', 'uk', 'co', 'shop', 'online', 'store'],
 
+    /*
+    |--------------------------------------------------------------------------
+    | "More options" list
+    |--------------------------------------------------------------------------
+    |
+    | How many alternative extensions the domain search page offers under the
+    | two headline cards, and how many candidates it may check to find them
+    | (some are taken, some are unpriced in the current storefront).
+    |
+    | Each candidate is one registrar availability call, cached for 60s. Raise
+    | the limit for a richer list; lower it if the registrar in use rate-limits
+    | availability checks aggressively (Porkbun allows roughly one per 10s).
+    |
+    */
+
+    'alternatives' => [
+        'limit' => (int) env('DOMAIN_ALTERNATIVES_LIMIT', 6),
+        'max_checks' => (int) env('DOMAIN_ALTERNATIVES_MAX_CHECKS', 10),
+    ],
+
     'request_timeout' => (int) env('DOMAIN_REQUEST_TIMEOUT', 30),
 
     /*

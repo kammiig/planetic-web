@@ -6,6 +6,7 @@ use App\Actions\Domains\CheckDomainAvailability;
 use App\Exceptions\RegistrarException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DomainSearchRequest;
+use App\Models\Testimonial;
 use App\Models\TldPricing;
 use App\Support\Region;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +31,9 @@ class DomainSearchController extends Controller
             'freeYearNotice' => config('billing.website_package.free_year_notice'),
             'featuredTlds' => $sellable(TldPricing::active()->where('is_featured', true)),
             'tldPrices' => $sellable(TldPricing::active()),
+            // The same rows the home page renders, through the same component:
+            // reviews are edited once in the admin and appear on both pages.
+            'testimonials' => Testimonial::active()->orderBy('sort_order')->get(),
         ]);
     }
 
