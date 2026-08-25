@@ -4,11 +4,23 @@ namespace Tests;
 
 use App\Enums\RoleName;
 use App\Models\User;
+use App\Support\Region;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Region::current() memoises the request's storefront in a static. A
+        // test that visits an /int/… URL would otherwise leak USD into every
+        // test that ran after it, so the suite would pass or fail on ordering
+        // alone — and a GBP-only price would resolve to null out of nowhere.
+        Region::flush();
+    }
+
     /** Ensure the role catalogue exists for role-aware tests. */
     protected function seedRoles(): void
     {

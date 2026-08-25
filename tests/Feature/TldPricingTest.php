@@ -41,6 +41,28 @@ class TldPricingTest extends TestCase
         }]);
     }
 
+    public function test_domain_page_publishes_the_real_renewal_prices(): void
+    {
+        // The page used to promise "renewal applies after the first year"
+        // without ever saying how much. It now quotes the admin price book.
+        $this->get('/domains')
+            ->assertOk()
+            ->assertSee('Straight talk on renewals')
+            ->assertSee('.co.uk')
+            ->assertSee('£8.99')   // .co.uk registers and renews at the same price
+            ->assertSee('£14.99'); // .com renews above its first year
+    }
+
+    public function test_renewal_table_withholds_a_tld_the_storefront_does_not_price(): void
+    {
+        // .co.uk carries no USD figure, so the USD storefront must not quote it
+        // at all rather than show a GBP number under a dollar sign.
+        $this->get('/int/domains')
+            ->assertOk()
+            ->assertSee('$17.99')      // .com renewal in USD
+            ->assertDontSee('.co.uk');
+    }
+
     public function test_resolver_matches_longest_tld_suffix(): void
     {
         $this->assertSame(8.99, TldPricing::priceForDomain('shop.example.co.uk'));

@@ -207,14 +207,97 @@
              edited in the admin updates both pages at once. --}}
         <x-testimonials-section :testimonials="$testimonials" class="bg-slate-50 section" />
 
-        {{-- ===================== Renewal honesty note ===================== --}}
-        <section class="container-px pb-14">
-            <div class="alert alert-info mx-auto max-w-3xl">
-                <h2 class="text-base font-bold">About domain renewals</h2>
-                <p class="mt-1 text-sm">
-                    Domains register for one year and renew annually. We remind you well before your renewal date — see the
-                    <a href="{{ region()->route('legal.renewal') }}" class="font-semibold underline">Renewal Policy</a>.
-                </p>
+        {{-- ===================== Renewals, in the open ===================== --}}
+        {{-- This used to be a lone alert box floating above the footer. The page
+             promises "renewal applies after the first year" without ever saying
+             how much, which is the one thing a customer actually wants to know
+             — so the closing section now answers it with the real price book. --}}
+        @php
+            // Only extensions this storefront prices in BOTH years can appear:
+            // quoting a first-year price with a blank renewal is exactly the
+            // vagueness this section exists to remove.
+            $renewalRows = ($featuredTlds->isNotEmpty() ? $featuredTlds : $tldPrices)
+                ->filter(fn ($tld) => $tld->registerPrice() !== null && $tld->renewPrice() !== null)
+                ->take(5);
+        @endphp
+
+        <section class="container-px section">
+            <div class="mx-auto max-w-5xl">
+                <div class="mx-auto max-w-2xl text-center">
+                    <p class="eyebrow">No surprises</p>
+                    <h2 class="mt-3 text-3xl font-bold sm:text-4xl">Straight talk on renewals</h2>
+                    <p class="mt-3 text-slate-600">
+                        Every domain registers for one year. Here is exactly what it includes and exactly what it costs
+                        when it renews — no introductory pricing that quietly triples later.
+                    </p>
+                </div>
+
+                <div class="mt-10 grid gap-6 lg:grid-cols-2">
+                    {{-- What you get, every time --}}
+                    <div class="card">
+                        <h3 class="text-lg font-bold text-slate-900">Included with every domain</h3>
+                        <ul class="mt-5 space-y-5 text-sm text-slate-700">
+                            @foreach ([
+                                ['Free WHOIS privacy', 'Your name, address and email stay out of the public WHOIS record.'],
+                                ['Automatic Cloudflare DNS &amp; SSL', 'We create the zone, point the nameservers and issue the certificate for you.'],
+                                ['Auto-renew, on by default', 'Nothing expires because a reminder went to spam — and you can switch it off any time.'],
+                                ['Managed from your dashboard', 'DNS records, contact details and renewals in one place, with support if you would rather we did it.'],
+                            ] as [$title, $detail])
+                                <li class="flex items-start gap-3">
+                                    <span class="feature-check" aria-hidden="true">
+                                        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+                                    </span>
+                                    <span>
+                                        <span class="block font-semibold text-slate-900">{!! $title !!}</span>
+                                        <span class="mt-0.5 block text-slate-600">{{ $detail }}</span>
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+
+                    {{-- The actual renewal figures --}}
+                    <div class="card flex flex-col">
+                        <div class="flex flex-wrap items-baseline justify-between gap-2">
+                            <h3 class="text-lg font-bold text-slate-900">What renewal costs</h3>
+                            <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Per year, {{ region()->currency() }}</span>
+                        </div>
+
+                        @if ($renewalRows->isNotEmpty())
+                            <div class="mt-5 overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <caption class="sr-only">Domain registration and renewal prices by extension</caption>
+                                    <thead>
+                                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <th scope="col" class="pb-2">Extension</th>
+                                            <th scope="col" class="pb-2 text-right">First year</th>
+                                            <th scope="col" class="pb-2 text-right">Renews at</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($renewalRows as $tld)
+                                            <tr class="border-t border-slate-100">
+                                                <th scope="row" class="py-2.5 text-left font-bold text-slate-900">.{{ ltrim($tld->tld, '.') }}</th>
+                                                <td class="py-2.5 text-right font-semibold text-slate-900">{{ money($tld->registerPrice()) }}</td>
+                                                <td class="py-2.5 text-right text-slate-600">{{ money($tld->renewPrice()) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+
+                        <p class="mt-5 border-t border-slate-100 pt-4 text-sm text-slate-600">
+                            We email you well before any renewal date, so a charge never arrives unannounced. Full terms
+                            are in the <a href="{{ region()->route('legal.renewal') }}" class="font-semibold text-primary-600 hover:underline">Renewal Policy</a>.
+                        </p>
+
+                    </div>
+                </div>
+
+                <div class="mt-8 text-center">
+                    <a href="#domain-q" class="btn-primary">Search a domain</a>
+                </div>
             </div>
         </section>
     </div>
